@@ -1,1 +1,1 @@
-export const formatUserId = (id: string) => `usr_${id}`
+export const formatUserId = (id: string) => `usr_${id}`;
