@@ -4,7 +4,7 @@ import { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { initChatModel } from "langchain/chat_models/universal";
 import { ensureConfiguration } from "../.libs/configuration.js";
 import { GraphAnnotation } from "../.libs/state.js";
-import { initializeTools } from "../.libs/tools.js";
+import { tools } from "../tools/index.js";
 import {
 	getStoreFromConfigOrThrow,
 	splitModelAndProvider,
@@ -42,7 +42,6 @@ export async function callModel(
 			apiKey: "sk-c4f4e23515e229a5-fijmyr-fc1cda87",
 		},
 	});
-	const tools = initializeTools(config);
 	const boundLLM = llm.bindTools(tools, {
 		tool_choice: "auto",
 	});

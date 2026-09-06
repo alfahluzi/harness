@@ -2,23 +2,26 @@
 import { AIMessage, BaseMessage } from "@langchain/core/messages";
 import { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { GraphAnnotation } from "../.libs/state.js";
-import { initializeTools } from "../.libs/tools.js";
+import { upsertMemoryTool } from "../tools/upsert-mem.js";
 
 export async function storeMemory(
 	state: typeof GraphAnnotation.State,
-	config: LangGraphRunnableConfig,
+	_config: LangGraphRunnableConfig,
 ): Promise<{ messages: BaseMessage[] }> {
 	const lastMessage = state.messages[state.messages.length - 1] as AIMessage;
 	const toolCalls = lastMessage.tool_calls || [];
 
-	const tools = initializeTools(config);
-	const upsertMemoryTool = tools[0];
-
 	const savedMemories = await Promise.all(
 		toolCalls.map(async (tc) => {
-			return await upsertMemoryTool.invoke(tc);
+			const result = await upsertMemoryTool.invoke(tc);
+			return typeof result === "string"
+				? new (await import("@langchain/core/messages")).ToolMessage({
+						content: result,
+						tool_call_id: tc.id ?? "",
+					})
+				: result;
 		}),
 	);
 
-	return { messages: savedMemories };
+	return { messages: savedMemories as BaseMessage[] };
 }
