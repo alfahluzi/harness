@@ -1,6 +1,10 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { buildMcpServer } from "./lib/mcp-server";
+import { sessionRoutes } from "./routes/sessions";
+import { sessionManager } from "./lib/session-manager";
 
 const app = new OpenAPIHono();
 
@@ -58,6 +62,28 @@ app.openapi(healthRoute, (c) =>
 app.doc("/doc", {
 	openapi: "3.0.0",
 	info: { title: "backend", version: "0.1.0", description: "Hono API" },
+});
+
+// REST surface for SessionManager (debug / frontend use)
+app.route("/api", sessionRoutes);
+
+// MCP Streamable HTTP surface for the same SessionManager instance
+const mcpServer = buildMcpServer();
+const mcpTransport = new StreamableHTTPTransport();
+app.all("/mcp", async (c) => {
+	if (!mcpServer.isConnected()) {
+		await mcpServer.connect(mcpTransport);
+	}
+	return mcpTransport.handleRequest(c);
+});
+
+process.on("SIGINT", async () => {
+	await sessionManager.cancelAll();
+	process.exit(0);
+});
+process.on("SIGTERM", async () => {
+	await sessionManager.cancelAll();
+	process.exit(0);
 });
 
 const port = Number(process.env.PORT ?? 3001);

@@ -10,7 +10,10 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@hono/mcp": "^0.3.2",
     "@hono/zod-openapi": "^1.6.3",
+    "@langchain/langgraph-sdk": "^1.10.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "hono": "^4.13.7",
     "zod": "^4.5.4"
   }
