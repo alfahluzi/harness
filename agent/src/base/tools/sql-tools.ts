@@ -137,10 +137,7 @@ export function createSqlTools(config: SqlToolsConfig): StructuredTool[] {
 			try {
 				return await withToolLog("sql:describeTable", input, async () => {
 					const { tableName } = input;
-					if (
-						allowedTables &&
-						!allowedTables.includes(tableName)
-					) {
+					if (allowedTables && !allowedTables.includes(tableName)) {
 						return toolError(
 							"sql:describeTable",
 							`table "${tableName}" is not in the allowed-tables list`,
@@ -153,9 +150,7 @@ export function createSqlTools(config: SqlToolsConfig): StructuredTool[] {
 						);
 					}
 					const cols = inRolledBackTx(() => {
-						const stmt = db.prepare(
-							`pragma table_info(${tableName})`,
-						);
+						const stmt = db.prepare(`pragma table_info(${tableName})`);
 						return stmt.all() as Array<{
 							cid: number;
 							name: string;
@@ -196,10 +191,7 @@ export function createSqlTools(config: SqlToolsConfig): StructuredTool[] {
 
 					// 2. Must start with SELECT or WITH (case-insensitive).
 					const head = stripped.split(/\s+/, 2).join(" ").toUpperCase();
-					if (
-						!head.startsWith("SELECT") &&
-						!head.startsWith("WITH")
-					) {
+					if (!head.startsWith("SELECT") && !head.startsWith("WITH")) {
 						return toolError(
 							"sql:runQuery",
 							"only read-only SELECT/WITH queries are allowed",

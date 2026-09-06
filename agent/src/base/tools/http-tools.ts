@@ -106,7 +106,8 @@ async function httpFetchImpl(
 	config: HttpToolsConfig,
 ): Promise<string> {
 	const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-	const maxResponseBytes = config.maxResponseBytes ?? DEFAULT_OUTPUT_LIMIT_BYTES;
+	const maxResponseBytes =
+		config.maxResponseBytes ?? DEFAULT_OUTPUT_LIMIT_BYTES;
 	const allowedHosts = config.allowedHosts;
 
 	return withToolLog(

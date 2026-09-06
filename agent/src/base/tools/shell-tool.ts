@@ -1,4 +1,7 @@
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import {
+	execFile,
+	type ExecFileOptionsWithStringEncoding,
+} from "node:child_process";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import {
@@ -182,7 +185,10 @@ async function runShell(
 
 	const meta = findMetacharacter(raw);
 	if (meta !== null) {
-		return toolError("shell", `command contains forbidden metacharacter ${meta}`);
+		return toolError(
+			"shell",
+			`command contains forbidden metacharacter ${meta}`,
+		);
 	}
 
 	const argv = tokenizeCommand(raw);
@@ -221,10 +227,12 @@ async function runShell(
  * injection). Returns a ready-to-register LangChain tool.
  */
 export function createShellTool(config: Partial<ShellToolConfig> = {}) {
-	const allowedCommands = config.allowedCommands ?? DEFAULT_SHELL_ALLOWED_COMMANDS;
+	const allowedCommands =
+		config.allowedCommands ?? DEFAULT_SHELL_ALLOWED_COMMANDS;
 	const cwd = config.cwd ?? process.cwd();
 	const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-	const outputLimitBytes = config.outputLimitBytes ?? DEFAULT_OUTPUT_LIMIT_BYTES;
+	const outputLimitBytes =
+		config.outputLimitBytes ?? DEFAULT_OUTPUT_LIMIT_BYTES;
 
 	const impl = async (input: { command: string }): Promise<string> =>
 		runShell(input, { allowedCommands, cwd, timeoutMs, outputLimitBytes });

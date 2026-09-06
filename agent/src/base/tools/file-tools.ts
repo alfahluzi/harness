@@ -58,23 +58,29 @@ export interface FileToolsConfig {
 /* ------------------------------------------------------------------ */
 
 export const readFileSchema = z.object({
-	path: z.string().describe(
-		"Path to a text file, relative to the sandbox root. " +
-			"Examples: 'notes.txt', 'data/config.json'. " +
-			"Must stay inside the sandbox root (no '..' escapes, no absolute paths).",
-	),
+	path: z
+		.string()
+		.describe(
+			"Path to a text file, relative to the sandbox root. " +
+				"Examples: 'notes.txt', 'data/config.json'. " +
+				"Must stay inside the sandbox root (no '..' escapes, no absolute paths).",
+		),
 });
 
 export const writeFileSchema = z.object({
-	path: z.string().describe(
-		"Path of the file to write, relative to the sandbox root. " +
-			"Parent directories are created as needed. " +
-			"Examples: 'notes.txt', 'subdir/new.txt'. " +
-			"Must stay inside the sandbox root (no '..' escapes, no absolute paths).",
-	),
-	content: z.string().describe(
-		"UTF-8 text content to write. Must not exceed the sandbox size limit.",
-	),
+	path: z
+		.string()
+		.describe(
+			"Path of the file to write, relative to the sandbox root. " +
+				"Parent directories are created as needed. " +
+				"Examples: 'notes.txt', 'subdir/new.txt'. " +
+				"Must stay inside the sandbox root (no '..' escapes, no absolute paths).",
+		),
+	content: z
+		.string()
+		.describe(
+			"UTF-8 text content to write. Must not exceed the sandbox size limit.",
+		),
 });
 
 export const listDirectorySchema = z.object({
@@ -89,11 +95,13 @@ export const listDirectorySchema = z.object({
 });
 
 export const deleteFileSchema = z.object({
-	path: z.string().describe(
-		"Path of the file to delete, relative to the sandbox root. " +
-			"Examples: 'notes.txt', 'tmp/old.txt'. " +
-			"Must stay inside the sandbox root (no '..' escapes, no absolute paths).",
-	),
+	path: z
+		.string()
+		.describe(
+			"Path of the file to delete, relative to the sandbox root. " +
+				"Examples: 'notes.txt', 'tmp/old.txt'. " +
+				"Must stay inside the sandbox root (no '..' escapes, no absolute paths).",
+		),
 });
 
 /* ------------------------------------------------------------------ */
@@ -152,8 +160,7 @@ export class FileTools {
 		}
 		this.rootDir = path.resolve(config.rootDir);
 		this.readOnly = config.readOnly === true;
-		this.maxFileSizeBytes =
-			config.maxFileSizeBytes ?? DEFAULT_MAX_FILE_BYTES;
+		this.maxFileSizeBytes = config.maxFileSizeBytes ?? DEFAULT_MAX_FILE_BYTES;
 		this.outputLimitBytes =
 			config.outputLimitBytes ?? DEFAULT_OUTPUT_LIMIT_BYTES;
 		if (this.maxFileSizeBytes <= 0) {
@@ -243,9 +250,7 @@ export class FileTools {
 		return `wrote ${bytes} byte(s) to ${real}`;
 	}
 
-	private async listDirectoryOp(
-		input: ListDirectoryInput,
-	): Promise<string> {
+	private async listDirectoryOp(input: ListDirectoryInput): Promise<string> {
 		const real = await this.resolveWithinRoot(input.path);
 		const dirents = await readdir(real, { withFileTypes: true });
 		const entries: Array<{
@@ -301,9 +306,7 @@ export class FileTools {
 	readFileTool(): StructuredTool {
 		return tool(
 			(input) =>
-				this.runTool("file:readFile", input, () =>
-					this.readFileOp(input),
-				),
+				this.runTool("file:readFile", input, () => this.readFileOp(input)),
 			{
 				name: "readFile",
 				description:
@@ -319,9 +322,7 @@ export class FileTools {
 	writeFileTool(): StructuredTool {
 		return tool(
 			(input) =>
-				this.runTool("file:writeFile", input, () =>
-					this.writeFileOp(input),
-				),
+				this.runTool("file:writeFile", input, () => this.writeFileOp(input)),
 			{
 				name: "writeFile",
 				description:
@@ -355,9 +356,7 @@ export class FileTools {
 	deleteFileTool(): StructuredTool {
 		return tool(
 			(input) =>
-				this.runTool("file:deleteFile", input, () =>
-					this.deleteFileOp(input),
-				),
+				this.runTool("file:deleteFile", input, () => this.deleteFileOp(input)),
 			{
 				name: "deleteFile",
 				description:
