@@ -1,0 +1,6 @@
+{
+	"graphs": {
+		"graph": "./src/base/graph.ts:graph"
+	},
+	"env": ".env"
+}
