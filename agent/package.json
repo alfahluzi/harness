@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "langgraphjs dev",
     "start": "langgraphjs dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@langchain/core": "^1.2.9",
@@ -15,10 +16,13 @@
     "@langchain/openai": "^1.5.11",
     "@types/uuid": "^10.0.0",
     "langchain": "^1.5.10",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@langchain/langgraph-cli": "^1.4.5",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
     "typescript": "^5.9.3"
   }
 }
