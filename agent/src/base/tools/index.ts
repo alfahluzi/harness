@@ -14,6 +14,7 @@ import { createShellTool, type ShellToolConfig } from "./shell-tool.js";
 import { createFileTools, type FileToolsConfig } from "./file-tools.js";
 import { createHttpTools, type HttpToolsConfig } from "./http-tools.js";
 import { createSqlTools, type SqlToolsConfig } from "./sql-tools.js";
+import { loadSessionManagerTools } from "./mcp-client.js";
 
 export interface ToolsConfig {
 	/**
@@ -57,6 +58,17 @@ export function getAllTools(config: ToolsConfig): StructuredTool[] {
 	tools.push(...createSqlTools(config.sql));
 
 	return tools;
+}
+
+/**
+ * Same as `getAllTools(config)` but also loads the session-manager MCP tools
+ * from the backend `/mcp` endpoint. Async because it performs an MCP
+ * handshake. Call once at graph build time, not per-invocation.
+ */
+export async function getAllToolsAsync(config: ToolsConfig): Promise<StructuredTool[]> {
+	const local = getAllTools(config);
+	const sessionTools = await loadSessionManagerTools();
+	return [...local, ...sessionTools];
 }
 
 // Re-export the individual factories + config types so callers can build

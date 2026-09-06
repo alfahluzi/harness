@@ -5,6 +5,7 @@ import { callModel } from "./nodes/call-llm.js";
 import { storeMemory } from "./nodes/store-mem.js";
 import { GraphAnnotation } from "./.libs/state.js";
 import { routeMessage } from "./edges/route-mem.js";
+import { checkpointer } from "./.libs/checkpointer.js";
 
 // Create the graph + all nodes
 export const builder = new StateGraph(GraphAnnotation, ConfigurationAnnotation)
@@ -17,5 +18,5 @@ export const builder = new StateGraph(GraphAnnotation, ConfigurationAnnotation)
 	})
 	.addEdge("store_memory", "call_model");
 
-export const graph = builder.compile();
+export const graph = builder.compile({ checkpointer });
 graph.name = "MemoryAgent";

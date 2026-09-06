@@ -10,5 +10,9 @@
 		"noEmit": true,
 		"types": ["node"]
 	},
-	"include": ["src/**/*.ts", "src/base/tools/index.ts"]
+	"include": [
+		"src/**/*.ts",
+		"src/base/tools/index.ts",
+		"src/base/.libs/checkpointer.ts"
+	]
 }
