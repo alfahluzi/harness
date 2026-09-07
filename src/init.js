@@ -89,10 +89,25 @@ async function copySkillTemplate(name) {
 
 async function initLocal() {
   const root = join(process.cwd(), PUNA_DIR);
+  const configPath = join(root, "config.json");
 
   if (existsSync(root)) {
-    console.error(`.puna/ already exists at ${root}. Nothing to do.`);
-    process.exit(1);
+    if (!existsSync(configPath)) {
+      console.error(`.puna/ exists at ${root} but ${configPath} missing. Aborting.`);
+      process.exit(1);
+    }
+    let cfg = {};
+    try {
+      cfg = JSON.parse(await readFile(configPath, "utf8"));
+    } catch (e) {
+      console.error(`Failed to parse ${configPath}: ${e.message}`);
+      process.exit(1);
+    }
+    cfg.globalConfigDir = GLOBAL_PUNA_DIR;
+    await writeFile(configPath, JSON.stringify(cfg, null, 2) + "\n");
+    console.log(`Refreshed ${configPath}`);
+    console.log(`  global_config: ${GLOBAL_PUNA_DIR}`);
+    return;
   }
 
   await mkdir(join(root, "docs/plan"), { recursive: true });
@@ -103,7 +118,7 @@ async function initLocal() {
     globalConfigDir: GLOBAL_PUNA_DIR,
   };
   await writeFile(
-    join(root, "config.json"),
+    configPath,
     JSON.stringify(config, null, 2) + "\n",
   );
 
