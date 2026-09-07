@@ -23,6 +23,13 @@ data/
 *.db-wal
 *.db-shm
 
+# Environment files (secrets)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
