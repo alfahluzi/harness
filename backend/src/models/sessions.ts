@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-export const tasks = sqliteTable("tasks", {
+export const sessions = sqliteTable("sessions", {
 	id: text("id").primaryKey(),
 	description: text("description").notNull(),
 	parentThreadId: text("parent_thread_id"),

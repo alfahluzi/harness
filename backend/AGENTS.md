@@ -10,7 +10,7 @@ src/
 │   ├── config.ts          # App configuration (env vars, defaults)
 │   └── db.ts              # Database connection (SQLite, Drizzle)
 ├── models/                # Drizzle ORM schema definitions
-│   └── tasks.ts           # Table definitions only
+│   └── sessions.ts        # Table definitions only
 └── modules/
     └── <feature>/
         ├── route.ts       # Hono route handlers + OpenAPI schemas

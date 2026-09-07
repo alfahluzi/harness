@@ -65,35 +65,35 @@ interface Stmts {
 function prepare(db: Database): Stmts {
 	return {
 		insert: db.prepare(`
-			INSERT INTO tasks (
+			INSERT INTO sessions (
 				id, description, parent_thread_id, child_thread_id, run_id,
 				agent_profile, background, status, created_at
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`),
-		get: db.prepare(`SELECT * FROM tasks WHERE id = ?`),
+		get: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
 		list: db.prepare(`
-			SELECT * FROM tasks ORDER BY created_at DESC
+			SELECT * FROM sessions ORDER BY created_at DESC
 		`),
 		listByParent: db.prepare(`
-			SELECT * FROM tasks WHERE parent_thread_id = ?
+			SELECT * FROM sessions WHERE parent_thread_id = ?
 		`),
 		setStatus: db.prepare(`
-			UPDATE tasks SET status = ? WHERE id = ?
+			UPDATE sessions SET status = ? WHERE id = ?
 		`),
 		setRunId: db.prepare(`
-			UPDATE tasks SET run_id = ? WHERE id = ?
+			UPDATE sessions SET run_id = ? WHERE id = ?
 		`),
 		setResult: db.prepare(`
-			UPDATE tasks
+			UPDATE sessions
 			   SET status = 'completed', result_json = ?, completed_at = ?
 			 WHERE id = ?
 		`),
 		setError: db.prepare(`
-			UPDATE tasks
+			UPDATE sessions
 			   SET status = 'error', error = ?, completed_at = ?
 			 WHERE id = ?
 		`),
-		delete: db.prepare(`DELETE FROM tasks WHERE id = ?`),
+		delete: db.prepare(`DELETE FROM sessions WHERE id = ?`),
 	};
 }
 
