@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
 import { ActiveWorkdirProvider } from "./hooks/use-active-workdir";
 import "./index.css";
+import "./lib/api-init";
 
 const router = createRouter({ routeTree });
 

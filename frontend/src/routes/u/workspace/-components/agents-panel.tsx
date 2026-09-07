@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAgent, useAgents } from "../../../../hooks/use-agents";
-import type { AgentDetail } from "../../../../types/puna";
+import type { AgentDetailResponse as AgentDetail } from "@/lib/api";
 import { SourceBadge } from "./source-badge";
 
 export function AgentsPanel() {

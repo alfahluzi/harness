@@ -1,4 +1,4 @@
-import type { LayerSource } from "../../../../types/puna";
+import type { LayerSource } from "@/lib/ui-types";
 
 export function SourceBadge({ source }: { source: LayerSource }) {
 	const isLocal = source === "local";

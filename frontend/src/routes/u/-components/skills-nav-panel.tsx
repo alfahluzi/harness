@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSkills } from "../../../hooks/use-skills";
-import type { SkillSummary } from "../../../types/puna";
+import type { SkillSummary } from "@/lib/api";
 
 export function SkillsNavPanel() {
 	const [localOpen, setLocalOpen] = useState(true);

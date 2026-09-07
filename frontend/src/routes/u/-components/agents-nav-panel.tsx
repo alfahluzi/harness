@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAgents } from "../../../hooks/use-agents";
-import type { AgentSummary } from "../../../types/puna";
+import type { AgentSummary } from "@/lib/api";
 
 export function AgentsNavPanel() {
 	const [localOpen, setLocalOpen] = useState(true);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSkill, useSkills } from "../../../../hooks/use-skills";
-import type { SkillDetail } from "../../../../types/puna";
+import type { SkillDetailResponse as SkillDetail } from "@/lib/api";
 import { SourceBadge } from "./source-badge";
 
 export function SkillsPanel() {

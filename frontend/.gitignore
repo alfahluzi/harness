@@ -1,0 +1,3 @@
+src/lib/api/client/
+src/lib/api/core/
+src/lib/api/**/*.gen.ts

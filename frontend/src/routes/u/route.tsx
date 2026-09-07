@@ -7,6 +7,7 @@ import { NavigationPanel } from "../../layout/navigation-panel";
 import { McpNavPanel } from "./-components/mcp-nav-panel";
 import { AgentsNavPanel } from "./-components/agents-nav-panel";
 import { SkillsNavPanel } from "./-components/skills-nav-panel";
+import { ChatNavPanel } from "../../layout/chat-nav-panel";
 import { useRef, useState } from "react";
 
 function ChatIcon({ className }: { className?: string }) {
@@ -131,6 +132,7 @@ const DOCK_ITEMS: NavigationLeftItem[] = [
 		id: "chat",
 		label: "Chat",
 		icon: ChatIcon,
+		child: <ChatNavPanel />,
 	},
 	{
 		id: "mcps",

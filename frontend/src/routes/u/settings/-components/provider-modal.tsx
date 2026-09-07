@@ -7,7 +7,8 @@ import {
 	useTestProviderCredentials,
 	useUpdateProvider,
 } from "../../../../hooks/use-providers";
-import type { ProviderSummary, ProviderType } from "../../../../types/puna";
+import type { ProviderSummary } from "@/lib/api";
+import type { ProviderType } from "@/lib/ui-types";
 import { PROVIDER_CATALOG } from "./provider-catalog";
 
 const inputClass =

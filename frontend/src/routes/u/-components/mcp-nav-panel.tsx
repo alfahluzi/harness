@@ -5,7 +5,7 @@ import {
 	useMcpSearch,
 	useUninstallMcp,
 } from "../../../hooks/use-mcps";
-import type { InstalledMcpSummary, PublicMcpSummary } from "../../../types/puna";
+import type { InstalledMcpSummary, PublicMcpSummary } from "@/lib/api";
 
 type PendingInstall = { name: string };
 

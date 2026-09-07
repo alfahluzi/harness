@@ -1,5 +1,5 @@
 import { useSessions } from "../../../../hooks/use-sessions";
-import type { SessionStatus, SessionSummary } from "../../../../types/puna";
+import type { SessionSummary } from "@/lib/api";
 
 const STATUS_STYLES: Record<string, string> = {
 	running: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -9,7 +9,7 @@ const STATUS_STYLES: Record<string, string> = {
 	cancelled: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
 };
 
-function statusClass(status: SessionStatus | string): string {
+function statusClass(status: string): string {
 	return STATUS_STYLES[status] ?? STATUS_STYLES.cancelled!;
 }
 

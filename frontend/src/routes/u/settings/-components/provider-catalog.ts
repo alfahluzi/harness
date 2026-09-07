@@ -1,4 +1,4 @@
-import type { ProviderType } from "../../../../types/puna";
+import type { ProviderType } from "@/lib/ui-types";
 
 export interface ProviderCatalogEntry {
 	label: string;

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useActiveWorkdir } from "../../../hooks/use-active-workdir";
 import { useProviders } from "../../../hooks/use-providers";
-import type { ProviderType } from "../../../types/puna";
+import type { ProviderType } from "@/lib/ui-types";
 import { PROVIDER_CATALOG } from "./-components/provider-catalog";
 import { ProviderModal } from "./-components/provider-modal";
 
