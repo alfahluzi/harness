@@ -4,8 +4,9 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import * as schema from "../models/sessions";
 
+// Shared with agent/ — both apps write to the same file at workspace root.
 const DB_PATH = resolve(
-	process.env.SQLITE_PATH ?? process.env.BACKEND_DB_PATH ?? "./data/backend.db",
+	process.env.SQLITE_PATH ?? process.env.BACKEND_DB_PATH ?? "../../data/shared.db",
 );
 
 mkdirSync(dirname(DB_PATH), { recursive: true });

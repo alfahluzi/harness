@@ -5,6 +5,7 @@ export type TaskStatus = "pending" | "running" | "completed" | "error" | "cancel
 
 export interface TaskRecord {
 	id: string;
+	workspaceId: string;
 	description: string;
 	parentThreadId?: string;
 	childThreadId: string;
@@ -20,6 +21,7 @@ export interface TaskRecord {
 
 interface TaskRow {
 	id: string;
+	workspace_id: string;
 	description: string;
 	parent_thread_id: string | null;
 	child_thread_id: string;
@@ -36,6 +38,7 @@ interface TaskRow {
 function rowToRecord(row: TaskRow): TaskRecord {
 	return {
 		id: row.id,
+		workspaceId: row.workspace_id,
 		description: row.description,
 		parentThreadId: row.parent_thread_id ?? undefined,
 		childThreadId: row.child_thread_id,
@@ -54,6 +57,7 @@ interface Stmts {
 	insert: Statement;
 	get: Statement;
 	list: Statement;
+	listByWorkspace: Statement;
 	listByParent: Statement;
 	setStatus: Statement;
 	setRunId: Statement;
@@ -66,13 +70,16 @@ function prepare(db: Database): Stmts {
 	return {
 		insert: db.prepare(`
 			INSERT INTO sessions (
-				id, description, parent_thread_id, child_thread_id, run_id,
+				id, workspace_id, description, parent_thread_id, child_thread_id, run_id,
 				agent_profile, background, status, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`),
 		get: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
 		list: db.prepare(`
 			SELECT * FROM sessions ORDER BY created_at DESC
+		`),
+		listByWorkspace: db.prepare(`
+			SELECT * FROM sessions WHERE workspace_id = ? ORDER BY created_at DESC
 		`),
 		listByParent: db.prepare(`
 			SELECT * FROM sessions WHERE parent_thread_id = ?
@@ -113,6 +120,7 @@ export class TaskRepository {
 	insert(task: TaskRecord): void {
 		this.stmts.insert.run(
 			task.id,
+			task.workspaceId,
 			task.description,
 			task.parentThreadId ?? null,
 			task.childThreadId,
@@ -135,8 +143,12 @@ export class TaskRepository {
 		return rowToRecord(row);
 	}
 
-	list(): TaskRow[] {
-		return this.stmts.list.all() as TaskRow[];
+	list(): TaskRecord[] {
+		return (this.stmts.list.all() as TaskRow[]).map(rowToRecord);
+	}
+
+	listByWorkspace(workspaceId: string): TaskRecord[] {
+		return (this.stmts.listByWorkspace.all(workspaceId) as TaskRow[]).map(rowToRecord);
 	}
 
 	listByParent(parentThreadId: string): TaskRecord[] {
@@ -164,8 +176,6 @@ export class TaskRepository {
 	}
 
 	getRunningTasks(): TaskRecord[] {
-		return this.list()
-			.filter((r) => r.status === "running")
-			.map(rowToRecord);
+		return this.list().filter((r) => r.status === "running");
 	}
 }

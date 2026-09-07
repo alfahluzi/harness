@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const CreateSessionInput = z.object({
+	workspaceId: z.string().min(1),
 	parent: z.string().optional(),
 	description: z.string().min(1),
 	prompt: z.string().min(1),

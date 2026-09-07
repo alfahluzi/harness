@@ -9,6 +9,7 @@ const app = new OpenAPIHono();
 const SessionSummarySchema = z
 	.object({
 		id: z.string(),
+		workspaceId: z.string(),
 		description: z.string(),
 		status: z.string(),
 		agentProfile: z.string(),
@@ -19,6 +20,7 @@ const SessionSummarySchema = z
 
 const CreateSessionSchema = z
 	.object({
+		workspaceId: z.string().min(1),
 		parent: z.string().optional(),
 		description: z.string().min(1),
 		prompt: z.string().min(1),
@@ -26,6 +28,10 @@ const CreateSessionSchema = z
 		background: z.boolean().default(true),
 	})
 	.openapi("CreateSessionInput");
+
+const WorkspaceIdQuerySchema = z
+	.object({ workspaceId: z.string().min(1) })
+	.openapi("WorkspaceIdQuery");
 
 const TaskIdParamSchema = z
 	.object({ id: z.string() })
@@ -57,9 +63,10 @@ const createRouteDef = createRoute({
 const listRouteDef = createRoute({
 	method: "get",
 	path: "/sessions",
+	request: { query: WorkspaceIdQuerySchema },
 	responses: {
 		200: {
-			description: "All known sessions",
+			description: "Sessions (filtered by workspaceId when provided)",
 			content: { "application/json": { schema: z.array(SessionSummarySchema) } },
 		},
 	},
@@ -144,7 +151,8 @@ app.openapi(createRouteDef, async (c) => {
 });
 
 app.openapi(listRouteDef, async (c) => {
-	const rows = await sessionService.list();
+	const { workspaceId } = c.req.valid("query");
+	const rows = await sessionService.list({ workspaceId });
 	return c.json(rows, 200);
 });
 

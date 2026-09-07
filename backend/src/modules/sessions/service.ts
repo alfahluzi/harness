@@ -13,6 +13,7 @@ export class SessionService {
 	}
 
 	async create(opts: {
+		workspaceId: string;
 		parent?: string;
 		description: string;
 		prompt: string;
@@ -25,6 +26,7 @@ export class SessionService {
 
 		const record: TaskRecord = {
 			id: taskId,
+			workspaceId: opts.workspaceId,
 			description: opts.description,
 			parentThreadId: opts.parent,
 			childThreadId: child.thread_id,
@@ -55,15 +57,18 @@ export class SessionService {
 		return { taskId, sessionId: child.thread_id, status: record.status };
 	}
 
-	async list() {
-		const rows = this.repo.list();
+	async list(opts: { workspaceId?: string } = {}) {
+		const rows = opts.workspaceId
+			? this.repo.listByWorkspace(opts.workspaceId)
+			: this.repo.list();
 		return rows.map((r) => ({
 			id: r.id,
+			workspaceId: r.workspaceId,
 			description: r.description,
 			status: r.status,
-			agentProfile: r.agent_profile,
-			createdAt: r.created_at,
-			completedAt: r.completed_at ?? undefined,
+			agentProfile: r.agentProfile,
+			createdAt: r.createdAt,
+			completedAt: r.completedAt,
 		}));
 	}
 

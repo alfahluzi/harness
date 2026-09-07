@@ -1,0 +1,42 @@
+{
+  "name": "@aldi-rudexylo/nusa",
+  "version": "0.1.0",
+  "description": "Harness agent CLI. Init .nusa/ workspaces and orchestrate agent + backend + frontend.",
+  "type": "module",
+  "bin": {
+    "nusa": "./bin/nusa.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "serve": "node bin/nusa.mjs serve",
+    "init": "node bin/nusa.mjs init"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.npm.md"
+  ],
+  "keywords": [
+    "agent",
+    "harness",
+    "ai",
+    "langgraph",
+    "mcp",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "aldi-rudexylo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aldi-rudexylo/nusa.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aldi-rudexylo/nusa/issues"
+  },
+  "homepage": "https://github.com/aldi-rudexylo/nusa#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

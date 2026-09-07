@@ -18,9 +18,10 @@ export function buildMcpServer() {
 			description:
 				"Spawn a sub-agent session to work on a task. Set background=true to continue " +
 				"working while it runs; you'll be notified when it completes. Set background=false " +
-				"to wait synchronously for the result. If you are delegating from inside a running " +
-				"agent thread, set `parent` to your own calling thread ID so the child can notify " +
-				"you when done.",
+				"to wait synchronously for the result. workspaceId is required and links the new " +
+				"session to a .nusa workspace. If you are delegating from inside a running agent " +
+				"thread, set `parent` to your own calling thread ID so the child can notify you " +
+				"when done.",
 			inputSchema: CreateSessionInput.shape,
 		},
 		async (args) => {
