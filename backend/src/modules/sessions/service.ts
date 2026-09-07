@@ -1,13 +1,13 @@
 import { Client } from "@langchain/langgraph-sdk";
 import { config } from "../../global/config";
-import { TaskRepository, type TaskRecord } from "./repository";
+import { SessionRepository, type SessionRecord } from "./repository";
 
 export class SessionService {
 	private client: Client;
-	private repo: TaskRepository;
+	private repo: SessionRepository;
 	private activeCount = new Map<string, number>();
 
-	constructor(repo: TaskRepository = new TaskRepository()) {
+	constructor(repo: SessionRepository = new SessionRepository()) {
 		this.client = new Client({ apiUrl: config.langgraphUrl });
 		this.repo = repo;
 	}
@@ -21,11 +21,11 @@ export class SessionService {
 		background: boolean;
 	}) {
 		const child = await this.client.threads.create();
-		const taskId = `bg_${crypto.randomUUID().slice(0, 8)}`;
+		const sessionId = `bg_${crypto.randomUUID().slice(0, 8)}`;
 		const createdAt = Date.now();
 
-		const record: TaskRecord = {
-			id: taskId,
+		const record: SessionRecord = {
+			id: sessionId,
 			workspaceId: opts.workspaceId,
 			description: opts.description,
 			parentThreadId: opts.parent,
@@ -41,7 +41,7 @@ export class SessionService {
 
 		if (!opts.background) {
 			record.status = "running";
-			this.repo.setStatus(taskId, "running");
+			this.repo.setStatus(sessionId, "running");
 			const run = await this.client.runs.wait(child.thread_id, config.graphId, {
 				input: { messages: [{ role: "human", content: opts.prompt }] },
 				config: { configurable: { agent_profile: opts.agentProfile } },
@@ -49,12 +49,21 @@ export class SessionService {
 			record.status = "completed";
 			record.completedAt = Date.now();
 			record.result = run;
-			this.repo.setResult(taskId, run, record.completedAt);
-			return { taskId, sessionId: child.thread_id, status: record.status, result: run };
+			this.repo.setResult(sessionId, run, record.completedAt);
+			return {
+				sessionId: sessionId,
+				thread_id: child.thread_id,
+				status: record.status,
+				result: run,
+			};
 		}
 
 		void this.launch(record, opts.prompt);
-		return { taskId, sessionId: child.thread_id, status: record.status };
+		return {
+			sessionId: sessionId,
+			thread_id: child.thread_id,
+			status: record.status,
+		};
 	}
 
 	async list(opts: { workspaceId?: string } = {}) {
@@ -72,16 +81,20 @@ export class SessionService {
 		}));
 	}
 
-	private async launch(record: TaskRecord, prompt: string) {
+	private async launch(record: SessionRecord, prompt: string) {
 		await this.acquireSlot(record.agentProfile);
 		record.status = "running";
 		this.repo.setStatus(record.id, "running");
 
 		try {
-			const run = await this.client.runs.create(record.childThreadId, config.graphId, {
-				input: { messages: [{ role: "human", content: prompt }] },
-				config: { configurable: { agent_profile: record.agentProfile } },
-			});
+			const run = await this.client.runs.create(
+				record.childThreadId,
+				config.graphId,
+				{
+					input: { messages: [{ role: "human", content: prompt }] },
+					config: { configurable: { agent_profile: record.agentProfile } },
+				},
+			);
 			record.runId = run.run_id;
 			this.repo.setRunId(record.id, run.run_id);
 
@@ -107,7 +120,7 @@ export class SessionService {
 		}
 	}
 
-	private async waitForCompletion(record: TaskRecord) {
+	private async waitForCompletion(record: SessionRecord) {
 		try {
 			for await (const _chunk of this.client.runs.joinStream(
 				record.childThreadId,
@@ -117,14 +130,17 @@ export class SessionService {
 			}
 		} catch {
 			while (true) {
-				const run = await this.client.runs.get(record.childThreadId, record.runId);
+				const run = await this.client.runs.get(
+					record.childThreadId,
+					record.runId,
+				);
 				if (run.status === "success" || run.status === "error") return;
 				await new Promise((r) => setTimeout(r, 2000));
 			}
 		}
 	}
 
-	private async notifyParent(record: TaskRecord) {
+	private async notifyParent(record: SessionRecord) {
 		if (!record.parentThreadId) return;
 
 		const siblings = this.repo.listByParent(record.parentThreadId);
@@ -146,13 +162,16 @@ export class SessionService {
 		}
 	}
 
-	private renderReminder(record: TaskRecord, stillRunning: boolean) {
-		const lines = [`[BACKGROUND TASK ${record.status.toUpperCase()}]`, `ID: ${record.id}`];
+	private renderReminder(record: SessionRecord, stillRunning: boolean) {
+		const lines = [
+			`[BACKGROUND SESSION ${record.status.toUpperCase()}]`,
+			`ID: ${record.id}`,
+		];
 		if (record.status === "error") lines.push(`Error: ${record.error}`);
 		lines.push(
 			stillRunning
-				? "Other background tasks still running. Do NOT poll."
-				: "All background tasks complete.",
+				? "Other background sessions still running. Do NOT poll."
+				: "All background sessions complete.",
 		);
 		lines.push(`Use get_result(id="${record.id}") to retrieve output.`);
 		return lines.join("\n");
@@ -160,12 +179,17 @@ export class SessionService {
 
 	async getStatus(id: string) {
 		const r = this.repo.getOrThrow(id);
-		return { status: r.status, createdAt: r.createdAt, completedAt: r.completedAt };
+		return {
+			status: r.status,
+			createdAt: r.createdAt,
+			completedAt: r.completedAt,
+		};
 	}
 
 	async getResult(id: string) {
 		const r = this.repo.getOrThrow(id);
-		if (r.status !== "completed" && r.status !== "error") return { status: r.status };
+		if (r.status !== "completed" && r.status !== "error")
+			return { status: r.status };
 		return { status: r.status, result: r.result };
 	}
 
@@ -189,7 +213,8 @@ export class SessionService {
 	}
 
 	private async acquireSlot(key: string) {
-		const limit = config.maxConcurrency[key] ?? config.maxConcurrency.default ?? 3;
+		const limit =
+			config.maxConcurrency[key] ?? config.maxConcurrency.default ?? 3;
 		while ((this.activeCount.get(key) ?? 0) >= limit) {
 			await new Promise((r) => setTimeout(r, 500));
 		}
@@ -197,11 +222,16 @@ export class SessionService {
 	}
 
 	private releaseSlot(key: string) {
-		this.activeCount.set(key, Math.max(0, (this.activeCount.get(key) ?? 1) - 1));
+		this.activeCount.set(
+			key,
+			Math.max(0, (this.activeCount.get(key) ?? 1) - 1),
+		);
 	}
 
 	async cancelAll() {
-		const runningTasks = this.repo.getRunningTasks();
-		await Promise.all(runningTasks.map((r) => this.delete(r.id).catch(() => {})));
+		const runningSessions = this.repo.getRunningSessions();
+		await Promise.all(
+			runningSessions.map((r) => this.delete(r.id).catch(() => {})),
+		);
 	}
 }

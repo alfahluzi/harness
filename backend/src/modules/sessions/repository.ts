@@ -1,9 +1,14 @@
 import type { Database, Statement } from "bun:sqlite";
 import { sqliteDb } from "../../global/db";
 
-export type TaskStatus = "pending" | "running" | "completed" | "error" | "cancelled";
+export type SessionStatus =
+	| "pending"
+	| "running"
+	| "completed"
+	| "error"
+	| "cancelled";
 
-export interface TaskRecord {
+export interface SessionRecord {
 	id: string;
 	workspaceId: string;
 	description: string;
@@ -12,14 +17,14 @@ export interface TaskRecord {
 	runId: string;
 	agentProfile: string;
 	background: boolean;
-	status: TaskStatus;
+	status: SessionStatus;
 	createdAt: number;
 	completedAt?: number;
 	result?: unknown;
 	error?: string;
 }
 
-interface TaskRow {
+interface SessionRow {
 	id: string;
 	workspace_id: string;
 	description: string;
@@ -28,14 +33,14 @@ interface TaskRow {
 	run_id: string | null;
 	agent_profile: string;
 	background: number;
-	status: TaskStatus;
+	status: SessionStatus;
 	created_at: number;
 	completed_at: number | null;
 	result_json: string | null;
 	error: string | null;
 }
 
-function rowToRecord(row: TaskRow): TaskRecord {
+function rowToRecord(row: SessionRow): SessionRecord {
 	return {
 		id: row.id,
 		workspaceId: row.workspace_id,
@@ -104,58 +109,62 @@ function prepare(db: Database): Stmts {
 	};
 }
 
-export class TaskNotFoundError extends Error {
+export class SessionNotFoundError extends Error {
 	constructor(id: string) {
-		super(`Task not found: ${id}`);
+		super(`Session not found: ${id}`);
 	}
 }
 
-export class TaskRepository {
+export class SessionRepository {
 	private stmts: Stmts;
 
 	constructor(db: Database = sqliteDb) {
 		this.stmts = prepare(db);
 	}
 
-	insert(task: TaskRecord): void {
+	insert(session: SessionRecord): void {
 		this.stmts.insert.run(
-			task.id,
-			task.workspaceId,
-			task.description,
-			task.parentThreadId ?? null,
-			task.childThreadId,
-			task.runId,
-			task.agentProfile,
-			task.background ? 1 : 0,
-			task.status,
-			task.createdAt,
+			session.id,
+			session.workspaceId,
+			session.description,
+			session.parentThreadId ?? null,
+			session.childThreadId,
+			session.runId,
+			session.agentProfile,
+			session.background ? 1 : 0,
+			session.status,
+			session.createdAt,
 		);
 	}
 
-	get(id: string): TaskRecord | null {
-		const row = this.stmts.get.get(id) as TaskRow | null;
+	get(id: string): SessionRecord | null {
+		const row = this.stmts.get.get(id) as SessionRow | null;
 		return row ? rowToRecord(row) : null;
 	}
 
-	getOrThrow(id: string): TaskRecord {
-		const row = this.stmts.get.get(id) as TaskRow | null;
-		if (!row) throw new TaskNotFoundError(id);
+	getOrThrow(id: string): SessionRecord {
+		const row = this.stmts.get.get(id) as SessionRow | null;
+		if (!row) throw new SessionNotFoundError(id);
 		return rowToRecord(row);
 	}
 
-	list(): TaskRecord[] {
-		return (this.stmts.list.all() as TaskRow[]).map(rowToRecord);
+	list(): SessionRecord[] {
+		return (this.stmts.list.all() as SessionRow[]).map(rowToRecord);
 	}
 
-	listByWorkspace(workspaceId: string): TaskRecord[] {
-		return (this.stmts.listByWorkspace.all(workspaceId) as TaskRow[]).map(rowToRecord);
+	listByWorkspace(workspaceId: string): SessionRecord[] {
+		return (this.stmts.listByWorkspace.all(workspaceId) as SessionRow[]).map(
+			rowToRecord,
+		);
 	}
 
-	listByParent(parentThreadId: string): TaskRecord[] {
-		return (this.stmts.listByParent.all(parentThreadId) as TaskRow[]).map(rowToRecord);
+	listByParent(parentThreadId: string): SessionRecord[] {
+		return (this.stmts.listByParent.all(parentThreadId) as SessionRow[]).map(
+			rowToRecord,
+		);
 	}
 
-	setStatus(id: string, status: TaskStatus): void {
+	setStatus(id: string, status: SessionStatus): void {
 		this.stmts.setStatus.run(status, id);
 	}
 
@@ -175,7 +184,7 @@ export class TaskRepository {
 		this.stmts.delete.run(id);
 	}
 
-	getRunningTasks(): TaskRecord[] {
+	getRunningSessions(): SessionRecord[] {
 		return this.list().filter((r) => r.status === "running");
 	}
 }

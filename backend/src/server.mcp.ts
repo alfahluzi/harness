@@ -1,7 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { SessionService } from "./modules/sessions/service";
-import { CreateSessionInput, TaskIdInput, SendMessageInput } from "./modules/sessions/schema";
+import {
+	CreateSessionInput,
+	SessionIdInput,
+	SendMessageInput,
+} from "./modules/sessions/schema";
 import { AgentService } from "./modules/agents/service";
 import { SkillService } from "./modules/skills/service";
 import { McpService } from "./modules/mcps/service";
@@ -14,8 +18,12 @@ const mcpService = new McpService();
 const mcpRegistry = new RegistryClient();
 
 const ConfigDirInput = z.object({ configDir: z.string().min(1) });
-const AgentLookupInput = ConfigDirInput.merge(z.object({ name: z.string().min(1) }));
-const SkillLookupInput = ConfigDirInput.merge(z.object({ name: z.string().min(1) }));
+const AgentLookupInput = ConfigDirInput.extend({
+	name: z.string().min(1),
+});
+const SkillLookupInput = ConfigDirInput.extend({
+	name: z.string().min(1),
+});
 const McpSearchInput = z.object({
 	q: z.string().min(1),
 	cursor: z.string().optional(),
@@ -24,10 +32,13 @@ const McpDetailInput = z.object({
 	name: z.string().min(1),
 	version: z.string().min(1).optional(),
 });
-const McpInstallInput = ConfigDirInput.merge(
-	z.object({ name: z.string().min(1), version: z.string().min(1).optional() }),
-);
-const McpUninstallInput = ConfigDirInput.merge(z.object({ name: z.string().min(1) }));
+const McpInstallInput = ConfigDirInput.extend({
+	name: z.string().min(1),
+	version: z.string().min(1).optional(),
+});
+const McpUninstallInput = ConfigDirInput.extend({
+	name: z.string().min(1),
+});
 
 export function buildMcpServer() {
 	const server = new McpServer({
@@ -73,8 +84,9 @@ export function buildMcpServer() {
 		"get_session_status",
 		{
 			title: "Get Session Status",
-			description: "Check the status of a background sub-agent task by its task id.",
-			inputSchema: TaskIdInput.shape,
+			description:
+				"Check the status of a background sub-agent task by its task id.",
+			inputSchema: SessionIdInput.shape,
 		},
 		async ({ id }) => {
 			const result = await sessionService.getStatus(id);
@@ -86,8 +98,9 @@ export function buildMcpServer() {
 		"get_session_result",
 		{
 			title: "Get Session Result",
-			description: "Retrieve the result of a completed background sub-agent task.",
-			inputSchema: TaskIdInput.shape,
+			description:
+				"Retrieve the result of a completed background sub-agent task.",
+			inputSchema: SessionIdInput.shape,
 		},
 		async ({ id }) => {
 			const result = await sessionService.getResult(id);
@@ -115,11 +128,13 @@ export function buildMcpServer() {
 		{
 			title: "Delete Session",
 			description: "Cancel a running sub-agent task and delete its session.",
-			inputSchema: TaskIdInput.shape,
+			inputSchema: SessionIdInput.shape,
 		},
 		async ({ id }) => {
 			await sessionService.delete(id);
-			return { content: [{ type: "text", text: JSON.stringify({ deleted: true }) }] };
+			return {
+				content: [{ type: "text", text: JSON.stringify({ deleted: true }) }],
+			};
 		},
 	);
 

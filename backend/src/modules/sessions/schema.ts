@@ -9,7 +9,7 @@ export const CreateSessionInput = z.object({
 	background: z.boolean().default(true),
 });
 
-export const TaskIdInput = z.object({
+export const SessionIdInput = z.object({
 	id: z.string(),
 });
 

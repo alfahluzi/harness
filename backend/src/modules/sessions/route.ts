@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { SessionService } from "./service";
-import { TaskNotFoundError } from "./repository";
+import { SessionNotFoundError } from "./repository";
 
 const sessionService = new SessionService();
 
@@ -33,17 +33,15 @@ const WorkspaceIdQuerySchema = z
 	.object({ workspaceId: z.string().min(1) })
 	.openapi("WorkspaceIdQuery");
 
-const TaskIdParamSchema = z
+const SessopmIdParamSchema = z
 	.object({ id: z.string() })
-	.openapi("TaskIdParam");
+	.openapi("SessionIdParam");
 
 const SendMessageSchema = z
 	.object({ message: z.string().min(1) })
 	.openapi("SendMessageInput");
 
-const NotFoundSchema = z
-	.object({ error: z.string() })
-	.openapi("NotFound");
+const NotFoundSchema = z.object({ error: z.string() }).openapi("NotFound");
 
 const createRouteDef = createRoute({
 	method: "post",
@@ -67,7 +65,9 @@ const listRouteDef = createRoute({
 	responses: {
 		200: {
 			description: "Sessions (filtered by workspaceId when provided)",
-			content: { "application/json": { schema: z.array(SessionSummarySchema) } },
+			content: {
+				"application/json": { schema: z.array(SessionSummarySchema) },
+			},
 		},
 	},
 	tags: ["sessions"],
@@ -76,7 +76,7 @@ const listRouteDef = createRoute({
 const statusRouteDef = createRoute({
 	method: "get",
 	path: "/sessions/:id",
-	request: { params: TaskIdParamSchema },
+	request: { params: SessopmIdParamSchema },
 	responses: {
 		200: {
 			description: "Session status",
@@ -93,7 +93,7 @@ const statusRouteDef = createRoute({
 const resultRouteDef = createRoute({
 	method: "get",
 	path: "/sessions/:id/result",
-	request: { params: TaskIdParamSchema },
+	request: { params: SessopmIdParamSchema },
 	responses: {
 		200: {
 			description: "Session result",
@@ -111,7 +111,7 @@ const messageRouteDef = createRoute({
 	method: "post",
 	path: "/sessions/:id/message",
 	request: {
-		params: TaskIdParamSchema,
+		params: SessopmIdParamSchema,
 		body: { content: { "application/json": { schema: SendMessageSchema } } },
 	},
 	responses: {
@@ -130,7 +130,7 @@ const messageRouteDef = createRoute({
 const deleteRouteDef = createRoute({
 	method: "delete",
 	path: "/sessions/:id",
-	request: { params: TaskIdParamSchema },
+	request: { params: SessopmIdParamSchema },
 	responses: {
 		200: {
 			description: "Session deleted",
@@ -161,7 +161,8 @@ app.openapi(statusRouteDef, async (c) => {
 	try {
 		return c.json(await sessionService.getStatus(id), 200);
 	} catch (e) {
-		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
 		throw e;
 	}
 });
@@ -171,7 +172,8 @@ app.openapi(resultRouteDef, async (c) => {
 	try {
 		return c.json(await sessionService.getResult(id), 200);
 	} catch (e) {
-		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
 		throw e;
 	}
 });
@@ -182,7 +184,8 @@ app.openapi(messageRouteDef, async (c) => {
 	try {
 		return c.json(await sessionService.sendMessage(id, message), 200);
 	} catch (e) {
-		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
 		throw e;
 	}
 });
@@ -193,7 +196,8 @@ app.openapi(deleteRouteDef, async (c) => {
 		await sessionService.delete(id);
 		return c.json({ deleted: true }, 200);
 	} catch (e) {
-		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
 		throw e;
 	}
 });
