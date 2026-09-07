@@ -5,21 +5,21 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const NUSA_DIR = ".nusa";
+const PUNA_DIR = ".puna";
 const REQUIRED_SERVICES = ["backend", "agent", "frontend"];
 
 export async function serve(args) {
 	const flags = parseFlags(args);
 	const cwd = process.cwd();
-	const nusaRoot = findNusa(cwd);
+	const punaRoot = findPuna(cwd);
 
-	if (!nusaRoot) {
-		console.error(`No .nusa/ found from ${cwd}. Run \`nusa init\` first.`);
+	if (!punaRoot) {
+		console.error(`No .puna/ found from ${cwd}. Run \`puna init\` first.`);
 		process.exit(1);
 	}
 
-	const ctx = await loadWorkspaceContext(nusaRoot, cwd);
-	const workspace = await scanWorkspace(nusaRoot);
+	const ctx = await loadWorkspaceContext(punaRoot, cwd);
+	const workspace = await scanWorkspace(punaRoot);
 
 	printBanner({ ctx, workspace });
 
@@ -32,10 +32,10 @@ export async function serve(args) {
 	if (missing.length) {
 		console.error(
 			`Cannot start services. Missing in ${REPO_ROOT}: ${missing.join(", ")}\n` +
-			`nusa serve needs the full harness repo (agent/ backend/ frontend/ as siblings).\n` +
+			`puna serve needs the full harness repo (agent/ backend/ frontend/ as siblings).\n` +
 			`After \`npm i -g\`, only the CLI ships. To run serve:\n` +
-			`  - clone https://github.com/aldi-rudexylo/nusa and \`node bin/nusa.mjs serve\` from it\n` +
-			`  - or \`npm link\` from a local clone: \`git clone ... && cd nusa && npm link && nusa serve\``,
+			`  - clone https://github.com/aldi-rudexylo/puna and \`node bin/puna.mjs serve\` from it\n` +
+			`  - or \`npm link\` from a local clone: \`git clone ... && cd puna && npm link && puna serve\``,
 		);
 		process.exit(1);
 	}
@@ -75,17 +75,17 @@ function parseFlags(args) {
 	for (const a of args) {
 		if (a === "--check" || a === "-c") flags.check = true;
 		else if (a === "--help" || a === "-h") {
-			console.log("Usage: nusa serve [--check]");
+			console.log("Usage: puna serve [--check]");
 			process.exit(0);
 		}
 	}
 	return flags;
 }
 
-function findNusa(start) {
+function findPuna(start) {
 	let dir = resolve(start);
 	while (true) {
-		if (existsSync(join(dir, NUSA_DIR))) return join(dir, NUSA_DIR);
+		if (existsSync(join(dir, PUNA_DIR))) return join(dir, PUNA_DIR);
 		const parent = dirname(dir);
 		if (parent === dir) return null;
 		dir = parent;
@@ -117,10 +117,10 @@ async function loadWorkspaceContext(configDir, cwd) {
 	};
 }
 
-async function scanWorkspace(nusaRoot) {
+async function scanWorkspace(punaRoot) {
 	const out = { plans: [], agents: [], skills: [] };
 
-	const planDir = join(nusaRoot, "docs/plan");
+	const planDir = join(punaRoot, "docs/plan");
 	if (existsSync(planDir)) {
 		const seen = new Set();
 		for (const f of await readdir(planDir)) {
@@ -132,7 +132,7 @@ async function scanWorkspace(nusaRoot) {
 		out.plans = [...seen].sort();
 	}
 
-	const agentsDir = join(nusaRoot, "agents");
+	const agentsDir = join(punaRoot, "agents");
 	if (existsSync(agentsDir)) {
 		for (const e of await readdir(agentsDir, { withFileTypes: true })) {
 			if (!e.isDirectory()) continue;
@@ -140,7 +140,7 @@ async function scanWorkspace(nusaRoot) {
 		}
 	}
 
-	const skillsDir = join(nusaRoot, "skills");
+	const skillsDir = join(punaRoot, "skills");
 	if (existsSync(skillsDir)) {
 		for (const e of await readdir(skillsDir, { withFileTypes: true })) {
 			if (!e.isDirectory()) continue;
@@ -153,7 +153,7 @@ async function scanWorkspace(nusaRoot) {
 
 function printBanner({ ctx, workspace }) {
 	const RESET = "\x1b[0m", BOLD = "\x1b[1m", DIM = "\x1b[2m";
-	console.log(`${BOLD}nusa serve${RESET}`);
+	console.log(`${BOLD}puna serve${RESET}`);
 	console.log(`${DIM}WorkspaceContext:${RESET}`);
 	console.log(`  id:         ${ctx.id}`);
 	console.log(`  root:       ${ctx.root}`);

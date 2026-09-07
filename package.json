@@ -1,17 +1,17 @@
 {
-  "name": "@aldi-rudexylo/nusa",
+  "name": "@aldi-rudexylo/puna",
   "version": "0.1.0",
-  "description": "Harness agent CLI. Init .nusa/ workspaces and orchestrate agent + backend + frontend.",
+  "description": "Harness agent CLI. Init .puna/ workspaces and orchestrate agent + backend + frontend.",
   "type": "module",
   "bin": {
-    "nusa": "./bin/nusa.mjs"
+    "puna": "./bin/puna.mjs"
   },
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "serve": "node bin/nusa.mjs serve",
-    "init": "node bin/nusa.mjs init"
+    "serve": "node bin/puna.mjs serve",
+    "init": "node bin/puna.mjs init"
   },
   "files": [
     "bin",
@@ -30,12 +30,12 @@
   "author": "aldi-rudexylo",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aldi-rudexylo/nusa.git"
+    "url": "https://github.com/aldi-rudexylo/puna.git"
   },
   "bugs": {
-    "url": "https://github.com/aldi-rudexylo/nusa/issues"
+    "url": "https://github.com/aldi-rudexylo/puna/issues"
   },
-  "homepage": "https://github.com/aldi-rudexylo/nusa#readme",
+  "homepage": "https://github.com/aldi-rudexylo/puna#readme",
   "publishConfig": {
     "access": "public"
   }

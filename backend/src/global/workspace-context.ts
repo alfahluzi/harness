@@ -10,7 +10,7 @@ export interface WorkspaceContext {
 	configDir: string;
 }
 
-interface NusaConfigFile {
+interface PunaConfigFile {
 	id: string;
 	version: number;
 }
@@ -28,7 +28,7 @@ export async function loadWorkspaceContext(configDir: string, cwd: string): Prom
 	} catch (e) {
 		throw new InvalidWorkspaceError(`Failed to parse ${configPath}: ${(e as Error).message}`);
 	}
-	const cfg = parsed as Partial<NusaConfigFile>;
+	const cfg = parsed as Partial<PunaConfigFile>;
 	if (typeof cfg.id !== "string" || cfg.id.length === 0) {
 		throw new InvalidWorkspaceError(`${configPath}: missing 'id'`);
 	}

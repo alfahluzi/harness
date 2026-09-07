@@ -1,11 +1,11 @@
-# @aldi-rudexylo/nusa
+# @aldi-rudexylo/puna
 
-CLI for the nusa harness agent system.
+CLI for the puna harness agent system.
 
 ## Install
 
 ```bash
-npm i -g @aldi-rudexylo/nusa
+npm i -g @aldi-rudexylo/puna
 ```
 
 ## Usage
@@ -13,18 +13,18 @@ npm i -g @aldi-rudexylo/nusa
 ```bash
 # In the project you want to harness:
 cd /path/to/your-project
-nusa init      # generates .nusa/ workspace
-# edit .nusa/agents/, .nusa/skills/, .nusa/docs/plan/
-nusa serve     # starts agent + backend + frontend (requires harness repo locally)
+puna init      # generates .puna/ workspace
+# edit .puna/agents/, .puna/skills/, .puna/docs/plan/
+puna serve     # starts agent + backend + frontend (requires harness repo locally)
 ```
 
 ## Commands
 
-- `nusa init` — create `.nusa/` workspace in the current directory
-- `nusa serve` — detect `.nusa/` workspace and start the harness (agent, backend, frontend)
-- `nusa serve --check` — validate the workspace without starting services
+- `puna init` — create `.puna/` workspace in the current directory
+- `puna serve` — detect `.puna/` workspace and start the harness (agent, backend, frontend)
+- `puna serve --check` — validate the workspace without starting services
 
-## `nusa serve` requires the harness repo
+## `puna serve` requires the harness repo
 
 The `serve` command expects the agent, backend, and frontend packages to live alongside
 the CLI (sibling `agent/`, `backend/`, `frontend/` directories). After a global install,
@@ -32,7 +32,7 @@ those aren't included.
 
 Options to make `serve` work:
 
-1. Clone the harness repo and run `node bin/nusa.mjs serve` from inside it
-2. `npm link` the repo: `git clone ... && cd nusa && npm link && nusa serve`
+1. Clone the harness repo and run `node bin/puna.mjs serve` from inside it
+2. `npm link` the repo: `git clone ... && cd puna && npm link && puna serve`
 
-See https://github.com/aldi-rudexylo/nusa for full docs.
+See https://github.com/aldi-rudexylo/puna for full docs.

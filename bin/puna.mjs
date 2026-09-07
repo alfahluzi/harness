@@ -23,11 +23,11 @@ switch (cmd) {
 }
 
 function printHelp() {
-  console.log(`nusa - harness agent CLI
+  console.log(`puna - harness agent CLI
 
 Usage:
-  nusa init    Create .nusa/ workspace in current directory
-  nusa serve   Detect .nusa/ workspace and start the harness
-  nusa help    Show this help
+  puna init    Create .puna/ workspace in current directory
+  puna serve   Detect .puna/ workspace and start the harness
+  puna help    Show this help
 `);
 }
