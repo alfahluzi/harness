@@ -1,6 +1,8 @@
 import { UserRound } from "lucide-react";
+import { useActiveWorkdir } from "../hooks/use-active-workdir";
 
 export function FooterBar() {
+	const { configDir } = useActiveWorkdir();
 	return (
 		<footer className="col-span-3 row-start-3 flex h-8 items-center justify-between border-t mt-0.5 border-neutral-200 bg-neutral-50/80 px-4 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/80 dark:text-neutral-400">
 			<div className="w-fit flex gap-1 justify-start">
@@ -10,8 +12,13 @@ export function FooterBar() {
 						<span>Aldi Fahluzi</span>
 					</div>
 				</_FooterButton>
-				<_FooterButton>
-					<span className="mx-2">Active Database: 2</span>
+				<_FooterButton title={configDir || "No active workspace"}>
+					<span className="mx-2">
+						Active Workspace:{" "}
+						<span className="font-mono">
+							{configDir || "(none)"}
+						</span>
+					</span>
 				</_FooterButton>
 				<_FooterButton>
 					<span className="mx-2">Plugins: 2</span>

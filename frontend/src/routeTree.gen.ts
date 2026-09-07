@@ -14,6 +14,7 @@ import { Route as URouteRouteImport } from './routes/u/route'
 import { Route as UIndexRouteImport } from './routes/u/index'
 import { Route as UIdIndexRouteImport } from './routes/u/$id/index'
 import { Route as UChatIndexRouteImport } from './routes/u/chat/index'
+import { Route as USettingsIndexRouteImport } from './routes/u/settings/index'
 import { Route as UWorkspaceIndexRouteImport } from './routes/u/workspace/index'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +42,11 @@ const UChatIndexRoute = UChatIndexRouteImport.update({
   path: '/chat/',
   getParentRoute: () => URouteRoute,
 } as any)
+const USettingsIndexRoute = USettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => URouteRoute,
+} as any)
 const UWorkspaceIndexRoute = UWorkspaceIndexRouteImport.update({
   id: '/workspace/',
   path: '/workspace/',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/u/': typeof UIndexRoute
   '/u/$id/': typeof UIdIndexRoute
   '/u/chat/': typeof UChatIndexRoute
+  '/u/settings/': typeof USettingsIndexRoute
   '/u/workspace/': typeof UWorkspaceIndexRoute
 }
 export interface FileRoutesByTo {
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/u': typeof UIndexRoute
   '/u/$id': typeof UIdIndexRoute
   '/u/chat': typeof UChatIndexRoute
+  '/u/settings': typeof USettingsIndexRoute
   '/u/workspace': typeof UWorkspaceIndexRoute
 }
 export interface FileRoutesById {
@@ -69,14 +77,30 @@ export interface FileRoutesById {
   '/u/': typeof UIndexRoute
   '/u/$id/': typeof UIdIndexRoute
   '/u/chat/': typeof UChatIndexRoute
+  '/u/settings/': typeof USettingsIndexRoute
   '/u/workspace/': typeof UWorkspaceIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/u' | '/u/' | '/u/$id/' | '/u/chat/' | '/u/workspace/'
+  fullPaths:
+    | '/'
+    | '/u'
+    | '/u/'
+    | '/u/$id/'
+    | '/u/chat/'
+    | '/u/settings/'
+    | '/u/workspace/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/u' | '/u/$id' | '/u/chat' | '/u/workspace'
-  id: '__root__' | '/' | '/u' | '/u/' | '/u/$id/' | '/u/chat/' | '/u/workspace/'
+  to: '/' | '/u' | '/u/$id' | '/u/chat' | '/u/settings' | '/u/workspace'
+  id:
+    | '__root__'
+    | '/'
+    | '/u'
+    | '/u/'
+    | '/u/$id/'
+    | '/u/chat/'
+    | '/u/settings/'
+    | '/u/workspace/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -121,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UChatIndexRouteImport
       parentRoute: typeof URouteRoute
     }
+    '/u/settings/': {
+      id: '/u/settings/'
+      path: '/settings'
+      fullPath: '/u/settings/'
+      preLoaderRoute: typeof USettingsIndexRouteImport
+      parentRoute: typeof URouteRoute
+    }
     '/u/workspace/': {
       id: '/u/workspace/'
       path: '/workspace'
@@ -135,6 +166,7 @@ interface URouteRouteChildren {
   UIndexRoute: typeof UIndexRoute
   UIdIndexRoute: typeof UIdIndexRoute
   UChatIndexRoute: typeof UChatIndexRoute
+  USettingsIndexRoute: typeof USettingsIndexRoute
   UWorkspaceIndexRoute: typeof UWorkspaceIndexRoute
 }
 
@@ -142,6 +174,7 @@ const URouteRouteChildren: URouteRouteChildren = {
   UIndexRoute: UIndexRoute,
   UIdIndexRoute: UIdIndexRoute,
   UChatIndexRoute: UChatIndexRoute,
+  USettingsIndexRoute: USettingsIndexRoute,
   UWorkspaceIndexRoute: UWorkspaceIndexRoute,
 }
 

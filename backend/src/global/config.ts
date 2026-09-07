@@ -18,4 +18,10 @@ export const config = {
 	// when set, else ~/.config/puna/mcps. Overridable via PUNA_SYSTEM_MCP_DIR.
 	systemMcpDir:
 		process.env.PUNA_SYSTEM_MCP_DIR ?? join(xdgConfigHome(), "puna", "mcps"),
+	// System-wide shared LLM provider connection target (global connect).
+	// XDG-aware: $XDG_CONFIG_HOME/puna/providers, else ~/.config/puna/providers.
+	// Overridable via PUNA_SYSTEM_PROVIDERS_DIR.
+	systemProvidersDir:
+		process.env.PUNA_SYSTEM_PROVIDERS_DIR ??
+		join(xdgConfigHome(), "puna", "providers"),
 };

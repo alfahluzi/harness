@@ -7,6 +7,15 @@ import type {
 	McpSearchResponse,
 	McpUninstallResponse,
 	PublicMcpDetail,
+	ProviderConnectInput,
+	ProviderDetail,
+	ProviderDisconnectResponse,
+	ProviderModelsResponse,
+	ProvidersListResponse,
+	ProviderTestInput,
+	ProviderTestResult,
+	ProviderUpdateInput,
+	SessionsListResponse,
 	SkillDetail,
 	SkillsListResponse,
 	WorkspacesDiscoverResponse,
@@ -56,6 +65,19 @@ async function post<T, B = unknown>(
 	return (await parseBody(res)) as T;
 }
 
+async function put<T, B = unknown>(
+	path: string,
+	body: B,
+	params?: Record<string, string | undefined>,
+): Promise<T> {
+	const res = await fetch(buildUrl(path, params), {
+		method: "PUT",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+	return (await parseBody(res)) as T;
+}
+
 async function del<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {
 	const res = await fetch(buildUrl(path, params), { method: "DELETE" });
 	return (await parseBody(res)) as T;
@@ -99,9 +121,43 @@ export const api = {
 				{ configDir },
 			),
 	},
+	providers: {
+		list: (configDir: string) =>
+			get<ProvidersListResponse>("/api/providers", { configDir }),
+		get: (configDir: string, id: string) =>
+			get<ProviderDetail>(`/api/providers/${encodeURIComponent(id)}`, { configDir }),
+		models: (configDir: string, id: string) =>
+			get<ProviderModelsResponse>(
+				`/api/providers/${encodeURIComponent(id)}/models`,
+				{ configDir },
+			),
+		test: (configDir: string, body: ProviderTestInput) =>
+			post<ProviderTestResult, ProviderTestInput>("/api/providers/test", body, {
+				configDir,
+			}),
+		connect: (configDir: string, body: ProviderConnectInput) =>
+			post<ProviderDetail, ProviderConnectInput>("/api/providers/connect", body, {
+				configDir,
+			}),
+		update: (configDir: string, id: string, body: ProviderUpdateInput) =>
+			put<ProviderDetail, ProviderUpdateInput>(
+				`/api/providers/${encodeURIComponent(id)}`,
+				body,
+				{ configDir },
+			),
+		disconnect: (configDir: string, id: string) =>
+			del<ProviderDisconnectResponse>(
+				`/api/providers/${encodeURIComponent(id)}`,
+				{ configDir },
+			),
+	},
 	workspaces: {
 		discover: (root?: string) =>
 			get<WorkspacesDiscoverResponse>("/api/workspaces/discover", { root }),
+	},
+	sessions: {
+		list: (workspaceId: string) =>
+			get<SessionsListResponse>("/api/sessions", { workspaceId }),
 	},
 };
 

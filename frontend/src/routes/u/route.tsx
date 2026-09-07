@@ -5,42 +5,9 @@ import { LeftBar, type NavigationLeftItem } from "../../layout/left-bar";
 import { MainPanel } from "../../layout/main-panel";
 import { NavigationPanel } from "../../layout/navigation-panel";
 import { McpNavPanel } from "./-components/mcp-nav-panel";
+import { AgentsNavPanel } from "./-components/agents-nav-panel";
+import { SkillsNavPanel } from "./-components/skills-nav-panel";
 import { useRef, useState } from "react";
-
-function UsersIcon({ className }: { className?: string }) {
-	return (
-		<svg
-			className={className}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-		>
-			<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-			<circle cx="9" cy="7" r="4" />
-			<path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-			<path d="M16 3.13a4 4 0 0 1 0 7.75" />
-		</svg>
-	);
-}
-
-function ShieldIcon({ className }: { className?: string }) {
-	return (
-		<svg
-			className={className}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-		>
-			<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-		</svg>
-	);
-}
 
 function ChatIcon({ className }: { className?: string }) {
 	return (
@@ -97,6 +64,45 @@ function McpIcon({ className }: { className?: string }) {
 	);
 }
 
+function AgentIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			className={className}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<rect width="16" height="12" x="4" y="8" rx="2" />
+			<path d="M12 8V4H8" />
+			<path d="M2 14h2" />
+			<path d="M20 14h2" />
+			<path d="M15 13v2" />
+			<path d="M9 13v2" />
+		</svg>
+	);
+}
+
+function SkillIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			className={className}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+			<path d="M9 18h6" />
+			<path d="M10 22h4" />
+		</svg>
+	);
+}
+
 function SettingsIcon({ className }: { className?: string }) {
 	return (
 		<svg
@@ -133,10 +139,22 @@ const DOCK_ITEMS: NavigationLeftItem[] = [
 		child: <McpNavPanel />,
 	},
 	{
+		id: "agents",
+		label: "Agents",
+		icon: AgentIcon,
+		child: <AgentsNavPanel />,
+	},
+	{
+		id: "skills",
+		label: "Skills",
+		icon: SkillIcon,
+		child: <SkillsNavPanel />,
+	},
+	{
 		id: "settings",
 		label: "Settings",
 		icon: SettingsIcon,
-		to: "/u/",
+		to: "/u/settings",
 	},
 ];
 

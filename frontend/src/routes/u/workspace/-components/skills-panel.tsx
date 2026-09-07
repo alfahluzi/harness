@@ -41,10 +41,12 @@ export function SkillsPanel() {
 				<span className="text-xs text-neutral-500">{skills.length} total</span>
 			</header>
 
-			<div className="grid grid-cols-2 gap-3 min-h-[12rem]">
-				<ul className="flex flex-col gap-1 overflow-auto max-h-96">
+			<div className="grid grid-cols-5 gap-3 min-h-48">
+				<ul className="flex flex-col col-span-1 gap-1 overflow-auto max-h-96">
 					{skills.length === 0 && (
-						<li className="text-sm text-neutral-500 italic">No skills in this workspace.</li>
+						<li className="text-sm text-neutral-500 italic">
+							No skills in this workspace.
+						</li>
 					)}
 					{skills.map((s) => (
 						<li key={s.name}>
@@ -58,26 +60,34 @@ export function SkillsPanel() {
 								}`}
 							>
 								<div className="flex items-center justify-between gap-2">
-									<span className="font-mono text-sm font-medium">{s.name}</span>
+									<span className="font-mono text-sm font-medium">
+										{s.name}
+									</span>
 									<SourceBadge source={s.source} />
 								</div>
 								<div className="flex items-center gap-2 mt-0.5">
-									<span className="text-[10px] text-neutral-500">{s.scriptCount} script(s)</span>
+									<span className="text-[10px] text-neutral-500">
+										{s.scriptCount} script(s)
+									</span>
 								</div>
 							</button>
 						</li>
 					))}
 				</ul>
 
-				<div className="border-l border-neutral-200 dark:border-neutral-800 pl-3 overflow-auto max-h-96">
+				<div className="border-l col-span-4 border-neutral-200 dark:border-neutral-800 pl-3 overflow-auto max-h-96">
 					{!selected && (
-						<p className="text-xs text-neutral-500 italic">Select a skill to see its description and scripts.</p>
+						<p className="text-xs text-neutral-500 italic">
+							Select a skill to see its description and scripts.
+						</p>
 					)}
 					{selected && detail.isLoading && (
 						<p className="text-xs text-neutral-500">Loading {selected}…</p>
 					)}
 					{selected && detail.error && (
-						<p className="text-xs text-red-600">Error: {detail.error.message}</p>
+						<p className="text-xs text-red-600">
+							Error: {detail.error.message}
+						</p>
 					)}
 					{selected && detail.data && <SkillDetailView skill={detail.data} />}
 				</div>
@@ -93,22 +103,31 @@ function SkillDetailView({ skill }: { skill: SkillDetail }) {
 				<span className="font-mono font-semibold">{skill.name}</span>
 				<SourceBadge source={skill.source} />
 			</div>
-			<div className="text-[10px] text-neutral-500 font-mono break-all">{skill.resolvedDir}</div>
+			<div className="text-[10px] text-neutral-500 font-mono break-all">
+				{skill.resolvedDir}
+			</div>
 			{skill.description ? (
 				<pre className="text-xs whitespace-pre-wrap font-sans bg-neutral-100 dark:bg-neutral-900 p-2 rounded">
 					{skill.description}
 				</pre>
 			) : (
-				<p className="text-xs text-neutral-500 italic">No description (desc.md missing).</p>
+				<p className="text-xs text-neutral-500 italic">
+					No description (desc.md missing).
+				</p>
 			)}
 			<div>
-				<p className="text-[10px] uppercase tracking-wide text-neutral-500">scripts</p>
+				<p className="text-[10px] uppercase tracking-wide text-neutral-500">
+					scripts
+				</p>
 				{skill.scripts.length === 0 ? (
 					<p className="text-[10px] text-neutral-400 italic">none</p>
 				) : (
 					<ul className="flex flex-col gap-0.5">
 						{skill.scripts.map((s) => (
-							<li key={s.path} className="text-xs font-mono text-neutral-700 dark:text-neutral-300">
+							<li
+								key={s.path}
+								className="text-xs font-mono text-neutral-700 dark:text-neutral-300"
+							>
 								{s.name}
 							</li>
 						))}

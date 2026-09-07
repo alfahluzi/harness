@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import * as schema from "../models/sessions";
+import * as schema from "../models";
 
 // Shared with agent/ — both apps write to the same file at workspace root.
 const DB_PATH = resolve(

@@ -179,3 +179,89 @@ export interface WorkspacesDiscoverResponse {
 	root: string;
 	workspaces: DiscoveredWorkspace[];
 }
+
+export type SessionStatus =
+	| "pending"
+	| "running"
+	| "completed"
+	| "error"
+	| "cancelled";
+
+export interface SessionSummary {
+	id: string;
+	workspaceId: string;
+	description: string;
+	status: SessionStatus | string;
+	agentProfile: string;
+	createdAt: number;
+	completedAt?: number;
+}
+
+export type SessionsListResponse = SessionSummary[];
+
+export type ProviderType = "openai" | "anthropic" | "google" | "openrouter" | "custom";
+
+export interface ProviderSummary {
+	id: string;
+	type: ProviderType;
+	name: string;
+	source: LayerSource;
+	baseUrl: string;
+	defaultModel: string;
+	hasApiKey: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface ProviderDetail extends ProviderSummary {
+	apiKeyMasked: string;
+}
+
+export interface ProvidersListResponse {
+	workspaceId: string;
+	globalConfigDir: string | null;
+	providers: ProviderSummary[];
+}
+
+export interface ProviderConnectInput {
+	type: ProviderType;
+	apiKey: string;
+	name?: string;
+	baseUrl?: string;
+	target?: "local" | "global";
+}
+
+export interface ProviderUpdateInput {
+	name?: string;
+	apiKey?: string;
+	baseUrl?: string;
+}
+
+export interface ProviderTestInput {
+	type: ProviderType;
+	apiKey?: string;
+	baseUrl?: string;
+}
+
+export interface ProviderModel {
+	providerId: string;
+	modelId: string;
+	name: string | null;
+}
+
+export interface ProviderModelsResponse {
+	providerId: string;
+	models: ProviderModel[];
+}
+
+export interface ProviderTestResult {
+	id: string;
+	ok: boolean;
+	latencyMs: number | null;
+	error: string | null;
+}
+
+export interface ProviderDisconnectResponse {
+	id: string;
+	disconnected: true;
+}

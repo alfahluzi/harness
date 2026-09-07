@@ -9,7 +9,11 @@ export function AgentsPanel() {
 	const detail = useAgent(selected);
 
 	if (list.isLoading) {
-		return <PanelShell title="Agents" count="…"><p className="text-sm text-neutral-500">Loading agents…</p></PanelShell>;
+		return (
+			<PanelShell title="Agents" count="…">
+				<p className="text-sm text-neutral-500">Loading agents…</p>
+			</PanelShell>
+		);
 	}
 	if (list.error) {
 		return (
@@ -19,7 +23,11 @@ export function AgentsPanel() {
 		);
 	}
 	if (!list.data) {
-		return <PanelShell title="Agents" count="0"><p className="text-sm text-neutral-500">No data.</p></PanelShell>;
+		return (
+			<PanelShell title="Agents" count="0">
+				<p className="text-sm text-neutral-500">No data.</p>
+			</PanelShell>
+		);
 	}
 
 	const agents = list.data.agents;
@@ -31,10 +39,12 @@ export function AgentsPanel() {
 				<span className="text-xs text-neutral-500">{agents.length} total</span>
 			</header>
 
-			<div className="grid grid-cols-2 gap-3 min-h-[12rem]">
-				<ul className="flex flex-col gap-1 overflow-auto max-h-96">
+			<div className="grid grid-cols-5 gap-3 min-h-48">
+				<ul className="flex flex-col col-span-1 gap-1 overflow-auto max-h-96">
 					{agents.length === 0 && (
-						<li className="text-sm text-neutral-500 italic">No agents found in this workspace.</li>
+						<li className="text-sm text-neutral-500 italic">
+							No agents found in this workspace.
+						</li>
 					)}
 					{agents.map((a) => (
 						<li key={a.name}>
@@ -48,7 +58,9 @@ export function AgentsPanel() {
 								}`}
 							>
 								<div className="flex items-center justify-between gap-2">
-									<span className="font-mono text-sm font-medium">{a.name}</span>
+									<span className="font-mono text-sm font-medium">
+										{a.name}
+									</span>
 									<SourceBadge source={a.source} />
 								</div>
 								{a.description && (
@@ -61,15 +73,19 @@ export function AgentsPanel() {
 					))}
 				</ul>
 
-				<div className="border-l border-neutral-200 dark:border-neutral-800 pl-3 overflow-auto max-h-96">
+				<div className="border-l col-span-4 border-neutral-200 dark:border-neutral-800 pl-3 overflow-auto max-h-96">
 					{!selected && (
-						<p className="text-xs text-neutral-500 italic">Select an agent to see its prompt and tools.</p>
+						<p className="text-xs text-neutral-500 italic">
+							Select an agent to see its prompt and tools.
+						</p>
 					)}
 					{selected && detail.isLoading && (
 						<p className="text-xs text-neutral-500">Loading {selected}…</p>
 					)}
 					{selected && detail.error && (
-						<p className="text-xs text-red-600">Error: {detail.error.message}</p>
+						<p className="text-xs text-red-600">
+							Error: {detail.error.message}
+						</p>
 					)}
 					{selected && detail.data && <AgentDetailView agent={detail.data} />}
 				</div>
@@ -105,7 +121,9 @@ function AgentDetailView({ agent }: { agent: AgentDetail }) {
 				<span className="font-mono font-semibold">{agent.name}</span>
 				<SourceBadge source={agent.source} />
 			</div>
-			<div className="text-[10px] text-neutral-500 font-mono break-all">{agent.resolvedDir}</div>
+			<div className="text-[10px] text-neutral-500 font-mono break-all">
+				{agent.resolvedDir}
+			</div>
 			{agent.description && <p className="text-xs">{agent.description}</p>}
 			<dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-xs">
 				<dt className="text-neutral-500">role</dt>
@@ -118,10 +136,14 @@ function AgentDetailView({ agent }: { agent: AgentDetail }) {
 			{agent.tools && (
 				<div className="flex flex-col gap-1">
 					<div>
-						<p className="text-[10px] uppercase tracking-wide text-neutral-500">tools allow</p>
+						<p className="text-[10px] uppercase tracking-wide text-neutral-500">
+							tools allow
+						</p>
 						<div className="flex flex-wrap gap-1">
 							{agent.tools.allow.length === 0 && (
-								<span className="text-[10px] text-neutral-400 italic">none</span>
+								<span className="text-[10px] text-neutral-400 italic">
+									none
+								</span>
 							)}
 							{agent.tools.allow.map((t) => (
 								<span
@@ -134,10 +156,14 @@ function AgentDetailView({ agent }: { agent: AgentDetail }) {
 						</div>
 					</div>
 					<div>
-						<p className="text-[10px] uppercase tracking-wide text-neutral-500">tools deny</p>
+						<p className="text-[10px] uppercase tracking-wide text-neutral-500">
+							tools deny
+						</p>
 						<div className="flex flex-wrap gap-1">
 							{agent.tools.deny.length === 0 && (
-								<span className="text-[10px] text-neutral-400 italic">none</span>
+								<span className="text-[10px] text-neutral-400 italic">
+									none
+								</span>
 							)}
 							{agent.tools.deny.map((t) => (
 								<span

@@ -7,7 +7,7 @@ export function ChatPanel({}: ChatPanelProps) {
 	];
 	return (
 		<div className="h-full w-full flex flex-col gap-2 items-center justify-start my-2 overflow-y-auto scrollbar-thin">
-			{random_data.map((value, index) => {
+			{random_data.map((_, index) => {
 				const isLast = index == random_data.length - 1;
 				return <ChatRequest last={isLast} />;
 			})}
