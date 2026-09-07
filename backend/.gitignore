@@ -30,6 +30,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # drizzle
 drizzle/
 
+# generated openapi dump (regenerate with `bun run openapi:dump`)
+openapi.json
+
 # IntelliJ based IDEs
 .idea
 
