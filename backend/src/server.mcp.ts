@@ -1,7 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { sessionManager } from "./session-manager";
-import { CreateSessionInput, TaskIdInput, SendMessageInput } from "../schemas/session";
+import { SessionService } from "./modules/sessions/service";
+import { CreateSessionInput, TaskIdInput, SendMessageInput } from "./modules/sessions/schema";
+
+const sessionService = new SessionService();
 
 export function buildMcpServer() {
 	const server = new McpServer({
@@ -22,7 +24,7 @@ export function buildMcpServer() {
 			inputSchema: CreateSessionInput.shape,
 		},
 		async (args) => {
-			const result = await sessionManager.create(args);
+			const result = await sessionService.create(args);
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);
@@ -37,7 +39,7 @@ export function buildMcpServer() {
 			inputSchema: z.object({}).shape,
 		},
 		async () => {
-			const result = await sessionManager.list();
+			const result = await sessionService.list();
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);
@@ -50,7 +52,7 @@ export function buildMcpServer() {
 			inputSchema: TaskIdInput.shape,
 		},
 		async ({ id }) => {
-			const result = await sessionManager.getStatus(id);
+			const result = await sessionService.getStatus(id);
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);
@@ -63,7 +65,7 @@ export function buildMcpServer() {
 			inputSchema: TaskIdInput.shape,
 		},
 		async ({ id }) => {
-			const result = await sessionManager.getResult(id);
+			const result = await sessionService.getResult(id);
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);
@@ -78,7 +80,7 @@ export function buildMcpServer() {
 			inputSchema: SendMessageInput.shape,
 		},
 		async ({ id, message }) => {
-			const result = await sessionManager.sendMessage(id, message);
+			const result = await sessionService.sendMessage(id, message);
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);
@@ -91,7 +93,7 @@ export function buildMcpServer() {
 			inputSchema: TaskIdInput.shape,
 		},
 		async ({ id }) => {
-			await sessionManager.delete(id);
+			await sessionService.delete(id);
 			return { content: [{ type: "text", text: JSON.stringify({ deleted: true }) }] };
 		},
 	);

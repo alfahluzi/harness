@@ -1,5 +1,8 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { sessionManager, TaskNotFoundError } from "../lib/session-manager";
+import { SessionService } from "./service";
+import { TaskNotFoundError } from "./repository";
+
+const sessionService = new SessionService();
 
 const app = new OpenAPIHono();
 
@@ -136,19 +139,19 @@ const deleteRouteDef = createRoute({
 
 app.openapi(createRouteDef, async (c) => {
 	const body = c.req.valid("json");
-	const result = await sessionManager.create(body);
+	const result = await sessionService.create(body);
 	return c.json(result, 200);
 });
 
 app.openapi(listRouteDef, async (c) => {
-	const rows = await sessionManager.list();
+	const rows = await sessionService.list();
 	return c.json(rows, 200);
 });
 
 app.openapi(statusRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	try {
-		return c.json(await sessionManager.getStatus(id), 200);
+		return c.json(await sessionService.getStatus(id), 200);
 	} catch (e) {
 		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
 		throw e;
@@ -158,7 +161,7 @@ app.openapi(statusRouteDef, async (c) => {
 app.openapi(resultRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	try {
-		return c.json(await sessionManager.getResult(id), 200);
+		return c.json(await sessionService.getResult(id), 200);
 	} catch (e) {
 		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
 		throw e;
@@ -169,7 +172,7 @@ app.openapi(messageRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	const { message } = c.req.valid("json");
 	try {
-		return c.json(await sessionManager.sendMessage(id, message), 200);
+		return c.json(await sessionService.sendMessage(id, message), 200);
 	} catch (e) {
 		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);
 		throw e;
@@ -179,7 +182,7 @@ app.openapi(messageRouteDef, async (c) => {
 app.openapi(deleteRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	try {
-		await sessionManager.delete(id);
+		await sessionService.delete(id);
 		return c.json({ deleted: true }, 200);
 	} catch (e) {
 		if (e instanceof TaskNotFoundError) return c.json({ error: e.message }, 404);

@@ -2,9 +2,9 @@ import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { StreamableHTTPTransport } from "@hono/mcp";
-import { buildMcpServer } from "./lib/mcp-server";
-import { sessionRoutes } from "./routes/sessions";
-import { sessionManager } from "./lib/session-manager";
+import { buildMcpServer } from "./server.mcp";
+import { sessionRoutes } from "./modules/sessions/route";
+import { SessionService } from "./modules/sessions/service";
 
 const app = new OpenAPIHono();
 
@@ -64,10 +64,10 @@ app.doc("/doc", {
 	info: { title: "backend", version: "0.1.0", description: "Hono API" },
 });
 
-// REST surface for SessionManager (debug / frontend use)
+// REST surface for SessionService (debug / frontend use)
 app.route("/api", sessionRoutes);
 
-// MCP Streamable HTTP surface for the same SessionManager instance
+// MCP Streamable HTTP surface for the same SessionService instance
 const mcpServer = buildMcpServer();
 const mcpTransport = new StreamableHTTPTransport();
 app.all("/mcp", async (c) => {
@@ -78,11 +78,14 @@ app.all("/mcp", async (c) => {
 });
 
 process.on("SIGINT", async () => {
-	await sessionManager.cancelAll();
+	const sessionService = new SessionService();
+	await sessionService.cancelAll();
 	process.exit(0);
 });
+
 process.on("SIGTERM", async () => {
-	await sessionManager.cancelAll();
+	const sessionService = new SessionService();
+	await sessionService.cancelAll();
 	process.exit(0);
 });
 
