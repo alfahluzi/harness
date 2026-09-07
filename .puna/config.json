@@ -1,5 +1,7 @@
 {
   "id": "4b23a80e-5495-475a-a3ac-9c2ad697d9b8",
   "cwd": "/home/aldi-rudexylo/Documents/labs/harness",
-  "createdAt": "2026-09-07T04:12:47.781Z"
+  "createdAt": "2026-09-07T04:12:47.781Z",
+  "version": 1,
+  "globalConfigDir": "/home/aldi-rudexylo/.config/.puna"
 }

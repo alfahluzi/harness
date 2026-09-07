@@ -1,3 +1,12 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+function xdgConfigHome(): string {
+	return process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME.length > 0
+		? process.env.XDG_CONFIG_HOME
+		: join(homedir(), ".config");
+}
+
 export const config = {
 	langgraphUrl: process.env.LANGGRAPH_URL ?? "http://localhost:2024",
 	// must match the graph key in agent/langgraph.json ("graph" -> ./src/base/graph.ts:graph)
@@ -5,4 +14,8 @@ export const config = {
 	maxConcurrency: {
 		default: 3,
 	} as Record<string, number>,
+	// System-wide shared MCP install target. XDG-aware: $XDG_CONFIG_HOME/puna/mcps
+	// when set, else ~/.config/puna/mcps. Overridable via PUNA_SYSTEM_MCP_DIR.
+	systemMcpDir:
+		process.env.PUNA_SYSTEM_MCP_DIR ?? join(xdgConfigHome(), "puna", "mcps"),
 };

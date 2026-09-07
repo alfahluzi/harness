@@ -1,8 +1,14 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, writeFile, mkdir, rm, symlink } from "node:fs/promises";
+import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
-import { mergeLayered, resolveSource, scanLayer } from "./workspace-scanner";
+import {
+	mergeLayered,
+	resolveSource,
+	scanLayer,
+	findWorkspaceDirs,
+	expandTilde,
+} from "./workspace-scanner";
 
 let tmpRoot: string;
 
@@ -150,5 +156,142 @@ describe("resolveSource", () => {
 
 		const result = resolveSource(localDir, null, "broken", "desc.md");
 		expect(result).toBeNull();
+	});
+});
+
+describe("expandTilde", () => {
+	test("expands bare ~ to homedir", () => {
+		expect(expandTilde("~")).toBe(homedir());
+	});
+	test("expands ~/sub to homedir/sub", () => {
+		expect(expandTilde("~/projects")).toBe(join(homedir(), "projects"));
+	});
+	test("leaves absolute paths alone", () => {
+		expect(expandTilde("/tmp/x")).toBe("/tmp/x");
+	});
+	test("leaves bare names alone", () => {
+		expect(expandTilde("foo")).toBe("foo");
+	});
+});
+
+describe("findWorkspaceDirs", () => {
+	async function makeWorkspace(parent: string, name: string) {
+		const punaDir = join(parent, ".puna");
+		await mkdir(punaDir, { recursive: true });
+		if (name) await writeFile(join(punaDir, "config.json"), JSON.stringify({ id: name }));
+		return punaDir;
+	}
+
+	test("returns empty when root does not exist", async () => {
+		const result = await findWorkspaceDirs("/nonexistent/path/that/is/not/there");
+		expect(result).toEqual([]);
+	});
+
+	test("returns empty when no .puna present", async () => {
+		await mkdir(join(tmpRoot, "empty-project"), { recursive: true });
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result).toEqual([]);
+	});
+
+	test("finds a single .puna at root level", async () => {
+		const puna = await makeWorkspace(tmpRoot, "alpha");
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result).toEqual([puna]);
+	});
+
+	test("finds nested .puna dirs", async () => {
+		const a = await makeWorkspace(join(tmpRoot, "a"), "a");
+		const b = await makeWorkspace(join(tmpRoot, "a", "b"), "b");
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result.sort()).toEqual([a, b].sort());
+	});
+
+	test("does not descend into a found .puna", async () => {
+		const outer = await makeWorkspace(tmpRoot, "outer");
+		// place a .puna inside .puna — should NOT be picked up
+		await makeWorkspace(join(outer, "sub"), "inner");
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result).toEqual([outer]);
+	});
+
+	test("skips node_modules and .git", async () => {
+		const real = await makeWorkspace(tmpRoot, "real");
+		await makeWorkspace(join(tmpRoot, "node_modules", "pkg"), "nm");
+		await makeWorkspace(join(tmpRoot, ".git"), "git");
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result).toEqual([real]);
+	});
+
+	test("skips other ignored dirs (dist, build, target, ...)", async () => {
+		const real = await makeWorkspace(tmpRoot, "real");
+		for (const d of ["dist", "build", "target", ".venv", "__pycache__", ".next", ".cache"]) {
+			await makeWorkspace(join(tmpRoot, d), d);
+		}
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result).toEqual([real]);
+	});
+
+	test("skips hidden (non-marker) dirs", async () => {
+		const real = await makeWorkspace(tmpRoot, "real");
+		await mkdir(join(tmpRoot, ".hidden"), { recursive: true });
+		await writeFile(join(tmpRoot, ".hidden", "x"), "x");
+		const result = await findWorkspaceDirs(tmpRoot);
+		expect(result).toEqual([real]);
+	});
+
+	test("respects maxDepth", async () => {
+		await makeWorkspace(join(tmpRoot, "a"), "a");
+		await makeWorkspace(join(tmpRoot, "a", "b"), "b");
+		await makeWorkspace(join(tmpRoot, "a", "b", "c"), "c");
+		const shallow = await findWorkspaceDirs(tmpRoot, ".puna", { maxDepth: 2 });
+		const deep = await findWorkspaceDirs(tmpRoot, ".puna", { maxDepth: 4 });
+		expect(shallow.length).toBeLessThan(deep.length);
+		expect(deep.length).toBe(3);
+	});
+
+	test("custom ignoreDirs overrides defaults", async () => {
+		const real = await makeWorkspace(tmpRoot, "real");
+		const vendorPuna = await makeWorkspace(join(tmpRoot, "vendor"), "vendor");
+		const defaultScan = await findWorkspaceDirs(tmpRoot);
+		expect(defaultScan.sort()).toEqual([real, vendorPuna].sort());
+		const customScan = await findWorkspaceDirs(tmpRoot, ".puna", {
+			ignoreDirs: new Set(["vendor"]),
+		});
+		expect(customScan).toEqual([real]);
+	});
+
+	test("does not follow symlinks", async () => {
+		const real = await makeWorkspace(tmpRoot, "real");
+		// symlink -> real; if followed, the .puna inside would be visited again (no-op)
+		// but a symlink named ".puna" itself must not be followed as a directory entry
+		try {
+			await symlink(join(tmpRoot, "real", ".puna"), join(tmpRoot, ".puna"), "dir");
+		} catch {
+			// some CI filesystems forbid symlinks; skip silently
+			const result = await findWorkspaceDirs(tmpRoot);
+			expect(result).toEqual([real]);
+			return;
+		}
+		const result = await findWorkspaceDirs(tmpRoot);
+		// The symlinked .puna is NOT counted (we skip symlinks)
+		expect(result).toEqual([real]);
+	});
+
+	test("returns sorted paths", async () => {
+		await makeWorkspace(join(tmpRoot, "z"), "z");
+		await makeWorkspace(join(tmpRoot, "a"), "a");
+		await makeWorkspace(join(tmpRoot, "m"), "m");
+		const result = await findWorkspaceDirs(tmpRoot);
+		const sorted = [...result].sort();
+		expect(result).toEqual(sorted);
+	});
+
+	test("custom marker", async () => {
+		await mkdir(join(tmpRoot, "ws1", ".nusa"), { recursive: true });
+		await mkdir(join(tmpRoot, "ws2", ".nusa"), { recursive: true });
+		const result = await findWorkspaceDirs(tmpRoot, ".nusa");
+		expect(result.sort()).toEqual(
+			[join(tmpRoot, "ws1", ".nusa"), join(tmpRoot, "ws2", ".nusa")].sort(),
+		);
 	});
 });

@@ -1,9 +1,10 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { FooterBar } from "../../layout/footer-bar";
 import { HeaderBar } from "../../layout/header-bar";
-import { LeftBar, type NavigationLeftItem } from "../../layout/left-dock";
+import { LeftBar, type NavigationLeftItem } from "../../layout/left-bar";
 import { MainPanel } from "../../layout/main-panel";
 import { NavigationPanel } from "../../layout/navigation-panel";
+import { McpNavPanel } from "./-components/mcp-nav-panel";
 import { useRef, useState } from "react";
 
 function UsersIcon({ className }: { className?: string }) {
@@ -57,6 +58,45 @@ function ChatIcon({ className }: { className?: string }) {
 	);
 }
 
+function WorkspaceIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			className={className}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<rect x="3" y="3" width="7" height="9" />
+			<rect x="14" y="3" width="7" height="5" />
+			<rect x="14" y="12" width="7" height="9" />
+			<rect x="3" y="16" width="7" height="5" />
+		</svg>
+	);
+}
+
+function McpIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			className={className}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<rect x="3" y="3" width="18" height="18" rx="2" />
+			<path d="M8 12h8" />
+			<path d="M12 8v8" />
+			<circle cx="8" cy="8" r="0.5" fill="currentColor" />
+			<circle cx="16" cy="16" r="0.5" fill="currentColor" />
+		</svg>
+	);
+}
+
 function SettingsIcon({ className }: { className?: string }) {
 	return (
 		<svg
@@ -76,24 +116,27 @@ function SettingsIcon({ className }: { className?: string }) {
 
 const DOCK_ITEMS: NavigationLeftItem[] = [
 	{
+		id: "workspace",
+		label: "Workspace",
+		icon: WorkspaceIcon,
+		to: "/u/workspace",
+	},
+	{
 		id: "chat",
 		label: "Chat",
 		icon: ChatIcon,
 	},
 	{
-		id: "users",
-		label: "Users",
-		icon: UsersIcon,
-	},
-	{
-		id: "roles",
-		label: "Roles",
-		icon: ShieldIcon,
+		id: "mcps",
+		label: "MCPs",
+		icon: McpIcon,
+		child: <McpNavPanel />,
 	},
 	{
 		id: "settings",
 		label: "Settings",
 		icon: SettingsIcon,
+		to: "/u/",
 	},
 ];
 

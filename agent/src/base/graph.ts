@@ -16,9 +16,11 @@ export const builder = new StateGraph(GraphAnnotation, ConfigurationAnnotation)
 	.addEdge(START, "call_model")
 	.addConditionalEdges("call_model", routeMessage, {
 		store_memory: "store_memory",
+		call_tool: "call_tool",
 		[END]: END,
 	})
-	.addEdge("store_memory", "call_model");
+	.addEdge("store_memory", "call_model")
+	.addEdge("call_tool", "call_model");
 
 export const graph = builder.compile({ checkpointer });
 graph.name = "MemoryAgent";

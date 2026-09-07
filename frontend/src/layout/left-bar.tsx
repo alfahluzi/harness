@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState, type ComponentType } from "react";
+import { Link } from "@tanstack/react-router";
 import { NavigationPanel } from "./navigation-panel";
 
 export interface NavigationLeftItem {
 	id: string;
 	label: string;
 	icon: ComponentType<{ className?: string }>;
+	to?: string;
 	child?: React.ReactNode;
 }
 
@@ -13,7 +15,7 @@ export interface LeftDockProps {
 }
 
 export function LeftBar({ items }: LeftDockProps) {
-	const [activeItemId, setActiveItemId] = useState<string | null>("users");
+	const [activeItemId, setActiveItemId] = useState<string | null>(null);
 	const handleActivate = (id: string) => {
 		setActiveItemId((prev) => (prev === id ? null : id));
 	};
@@ -58,6 +60,23 @@ export function LeftBar({ items }: LeftDockProps) {
 				{items.map((item) => {
 					const isActive = item.id === activeItemId;
 					const Icon = item.icon;
+					const className = `flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+						isActive
+							? "bg-slate-50 text-slate-600 dark:bg-slate-500/10 dark:text-slate-400"
+							: "text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+					}`;
+					if (item.to) {
+						return (
+							<Link
+								key={item.id}
+								to={item.to}
+								aria-label={item.label}
+								className={className}
+							>
+								<Icon className="h-5 w-5" />
+							</Link>
+						);
+					}
 					return (
 						<button
 							key={item.id}
@@ -65,11 +84,7 @@ export function LeftBar({ items }: LeftDockProps) {
 							aria-label={item.label}
 							aria-pressed={isActive}
 							onClick={() => handleActivate(item.id)}
-							className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-								isActive
-									? "bg-slate-50 text-slate-600 dark:bg-slate-500/10 dark:text-slate-400"
-									: "text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-							}`}
+							className={className}
 						>
 							<Icon className="h-5 w-5" />
 						</button>

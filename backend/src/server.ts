@@ -7,6 +7,8 @@ import { sessionRoutes } from "./modules/sessions/route";
 import { SessionService } from "./modules/sessions/service";
 import { agentRoutes } from "./modules/agents/route";
 import { skillRoutes } from "./modules/skills/route";
+import { mcpRoutes } from "./modules/mcps/route";
+import { workspaceRoutes } from "./modules/workspaces/route";
 
 const app = new OpenAPIHono();
 
@@ -70,6 +72,8 @@ app.doc("/doc", {
 app.route("/api", sessionRoutes);
 app.route("/api", agentRoutes);
 app.route("/api", skillRoutes);
+app.route("/api", mcpRoutes);
+app.route("/api", workspaceRoutes);
 
 // MCP Streamable HTTP surface for the same SessionService instance
 const mcpServer = buildMcpServer();

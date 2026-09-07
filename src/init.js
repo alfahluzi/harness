@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, chmod, copyFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { homedir } from "node:os";
@@ -10,6 +10,7 @@ const CONFIG_VERSION = 1;
 const GLOBAL_PUNA_DIR = join(homedir(), ".config", PUNA_DIR);
 
 const AGENTS = ["semar", "cepot", "dawala", "gareng"];
+const SKILLS = ["create-agent", "create-skill", "planning"];
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = resolve(__dirname, "..", "templates");
@@ -43,19 +44,47 @@ async function initGlobal() {
   }
 
   await mkdir(join(GLOBAL_PUNA_DIR, "agents"), { recursive: true });
+  await mkdir(join(GLOBAL_PUNA_DIR, "skills"), { recursive: true });
 
   for (const name of AGENTS) {
-    const srcDir = join(TEMPLATES_DIR, "agents", name);
-    const destDir = join(GLOBAL_PUNA_DIR, "agents", name);
-    await mkdir(destDir, { recursive: true });
-    const conf = await readFile(join(srcDir, "conf.json"), "utf8");
-    const prompt = await readFile(join(srcDir, "prompt.md"), "utf8");
-    await writeFile(join(destDir, "conf.json"), conf);
-    await writeFile(join(destDir, "prompt.md"), prompt);
+    await copyAgentTemplate(name);
+  }
+  for (const name of SKILLS) {
+    await copySkillTemplate(name);
   }
 
   console.log(`Initialized global puna config at ${resolve(GLOBAL_PUNA_DIR)}`);
   console.log(`  Agents: ${AGENTS.join(", ")}`);
+  console.log(`  Skills: ${SKILLS.join(", ")}`);
+}
+
+async function copyAgentTemplate(name) {
+  const srcDir = join(TEMPLATES_DIR, "agents", name);
+  const destDir = join(GLOBAL_PUNA_DIR, "agents", name);
+  await mkdir(destDir, { recursive: true });
+  const conf = await readFile(join(srcDir, "conf.json"), "utf8");
+  const prompt = await readFile(join(srcDir, "prompt.md"), "utf8");
+  await writeFile(join(destDir, "conf.json"), conf);
+  await writeFile(join(destDir, "prompt.md"), prompt);
+}
+
+async function copySkillTemplate(name) {
+  const srcDir = join(TEMPLATES_DIR, "skills", name);
+  const destDir = join(GLOBAL_PUNA_DIR, "skills", name);
+  await mkdir(destDir, { recursive: true });
+  const desc = await readFile(join(srcDir, "desc.md"), "utf8");
+  await writeFile(join(destDir, "desc.md"), desc);
+
+  const scriptsDir = join(srcDir, "scripts");
+  if (existsSync(scriptsDir)) {
+    const destScripts = join(destDir, "scripts");
+    await mkdir(destScripts, { recursive: true });
+    for (const f of await readdir(scriptsDir)) {
+      const destPath = join(destScripts, f);
+      await copyFile(join(scriptsDir, f), destPath);
+      await chmod(destPath, 0o755);
+    }
+  }
 }
 
 async function initLocal() {
