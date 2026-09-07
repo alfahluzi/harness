@@ -1,0 +1,11 @@
+{
+  "name": "Cepot",
+  "role": "critic_risk_reviewer",
+  "temperature": 0.65,
+  "called": "after Dawala",
+  "tools": {
+    "allow": ["read", "glob", "grep", "lsp_*"],
+    "deny": ["write", "edit", "bash", "task", "webfetch", "websearch", "question"]
+  },
+  "description": "Gatekeeper sebelum kode di-approve. Menilai kualitas solusi DAN risiko dampak (security, data loss, breaking change, cost)."
+}

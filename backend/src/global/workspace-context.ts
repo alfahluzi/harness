@@ -8,11 +8,13 @@ export interface WorkspaceContext {
 	root: string;
 	cwd: string;
 	configDir: string;
+	globalConfigDir: string | null;
 }
 
 interface PunaConfigFile {
 	id: string;
 	version: number;
+	globalConfigDir?: string;
 }
 
 export class InvalidWorkspaceError extends Error {}
@@ -35,10 +37,15 @@ export async function loadWorkspaceContext(configDir: string, cwd: string): Prom
 	if (typeof cfg.version !== "number") {
 		throw new InvalidWorkspaceError(`${configPath}: missing 'version'`);
 	}
+	const globalConfigDir =
+		typeof cfg.globalConfigDir === "string" && cfg.globalConfigDir.length > 0
+			? cfg.globalConfigDir
+			: null;
 	return {
 		id: cfg.id,
 		root: dirname(configDir),
 		cwd,
 		configDir,
+		globalConfigDir,
 	};
 }

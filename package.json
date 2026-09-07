@@ -11,11 +11,13 @@
   },
   "scripts": {
     "serve": "node bin/puna.mjs serve",
-    "init": "node bin/puna.mjs init"
+    "init": "node bin/puna.mjs init",
+    "postinstall": "node bin/puna.mjs init --global"
   },
   "files": [
     "bin",
     "src",
+    "templates",
     "README.npm.md"
   ],
   "keywords": [

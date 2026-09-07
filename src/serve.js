@@ -19,7 +19,7 @@ export async function serve(args) {
 	}
 
 	const ctx = await loadWorkspaceContext(punaRoot, cwd);
-	const workspace = await scanWorkspace(punaRoot);
+	const workspace = await scanWorkspace(punaRoot, ctx.globalConfigDir);
 
 	printBanner({ ctx, workspace });
 
@@ -114,10 +114,12 @@ async function loadWorkspaceContext(configDir, cwd) {
 		root: dirname(configDir),
 		cwd,
 		configDir,
+		globalConfigDir:
+			typeof cfg.globalConfigDir === "string" ? cfg.globalConfigDir : null,
 	};
 }
 
-async function scanWorkspace(punaRoot) {
+async function scanWorkspace(punaRoot, globalConfigDir) {
 	const out = { plans: [], agents: [], skills: [] };
 
 	const planDir = join(punaRoot, "docs/plan");
@@ -132,23 +134,42 @@ async function scanWorkspace(punaRoot) {
 		out.plans = [...seen].sort();
 	}
 
-	const agentsDir = join(punaRoot, "agents");
-	if (existsSync(agentsDir)) {
-		for (const e of await readdir(agentsDir, { withFileTypes: true })) {
-			if (!e.isDirectory()) continue;
-			if (existsSync(join(agentsDir, e.name, "prompt.md"))) out.agents.push(e.name);
-		}
-	}
+	out.agents = await mergeLayered(
+		join(punaRoot, "agents"),
+		globalConfigDir ? join(globalConfigDir, "agents") : null,
+		"prompt.md",
+	);
 
-	const skillsDir = join(punaRoot, "skills");
-	if (existsSync(skillsDir)) {
-		for (const e of await readdir(skillsDir, { withFileTypes: true })) {
-			if (!e.isDirectory()) continue;
-			if (existsSync(join(skillsDir, e.name, "desc.md"))) out.skills.push(e.name);
-		}
-	}
+	out.skills = await mergeLayered(
+		join(punaRoot, "skills"),
+		globalConfigDir ? join(globalConfigDir, "skills") : null,
+		"desc.md",
+	);
 
 	return out;
+}
+
+async function mergeLayered(localDir, globalDir, marker) {
+	const localNames = await scanLayer(localDir, marker);
+	const globalNames = await scanLayer(globalDir, marker);
+
+	const merged = new Map();
+	for (const name of globalNames) merged.set(name, "global");
+	for (const name of localNames) merged.set(name, "local");
+
+	return [...merged.entries()]
+		.map(([name, source]) => ({ name, source }))
+		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function scanLayer(dir, marker) {
+	if (!dir || !existsSync(dir)) return new Set();
+	const names = new Set();
+	for (const e of await readdir(dir, { withFileTypes: true })) {
+		if (!e.isDirectory()) continue;
+		if (existsSync(join(dir, e.name, marker))) names.add(e.name);
+	}
+	return names;
 }
 
 function printBanner({ ctx, workspace }) {
@@ -162,8 +183,9 @@ function printBanner({ ctx, workspace }) {
 	console.log("");
 	console.log(`${BOLD}workspace contents:${RESET}`);
 	console.log(`  plans:  ${workspace.plans.length ? workspace.plans.join(", ") : "(none)"}`);
-	console.log(`  agents: ${workspace.agents.length ? workspace.agents.join(", ") : "(none)"}`);
-	console.log(`  skills: ${workspace.skills.length ? workspace.skills.join(", ") : "(none)"}`);
+	const fmtLayered = (arr) => arr.map((a) => `${a.name} (${a.source})`).join(", ");
+	console.log(`  agents: ${workspace.agents.length ? fmtLayered(workspace.agents) : "(none)"}`);
+	console.log(`  skills: ${workspace.skills.length ? fmtLayered(workspace.skills) : "(none)"}`);
 	console.log("");
 }
 

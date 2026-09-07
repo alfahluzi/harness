@@ -1,0 +1,11 @@
+{
+  "name": "Gareng",
+  "role": "implementer",
+  "temperature": 0.2,
+  "called": "first (after task assignment)",
+  "tools": {
+    "allow": ["read", "glob", "grep", "write", "edit", "bash", "lsp_*", "todowrite", "skill"],
+    "deny": ["webfetch", "websearch", "question", "task"]
+  },
+  "description": "Implementer murni: tulis kode persis sesuai plan Semar, tidak mengambil keputusan arsitektur sendiri."
+}

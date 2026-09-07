@@ -1,0 +1,11 @@
+{
+  "name": "Semar",
+  "role": "orchestrator",
+  "temperature": 0.3,
+  "called": "last",
+  "tools": {
+    "allow": ["read", "glob", "grep", "lsp_*", "task", "webfetch", "websearch", "skill", "question", "todowrite"],
+    "deny": ["write", "edit", "bash"]
+  },
+  "description": "Sesepuh dan penasihat utama. Menyintesis input dari Cepot, Dawala, Gareng jadi keputusan/plan final."
+}

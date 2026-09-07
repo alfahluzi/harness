@@ -1,14 +1,65 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
+import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { workspaceId } from "./ulid.js";
 
 const PUNA_DIR = ".puna";
 const CONFIG_VERSION = 1;
+const GLOBAL_PUNA_DIR = join(homedir(), ".config", PUNA_DIR);
 
-export async function init(_args) {
-  const cwd = process.cwd();
-  const root = join(cwd, PUNA_DIR);
+const AGENTS = ["semar", "cepot", "dawala", "gareng"];
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_DIR = resolve(__dirname, "..", "templates");
+
+export async function init(args = []) {
+  const isGlobal = args.includes("--global");
+
+  if (isGlobal) {
+    await initGlobal();
+    return;
+  }
+
+  await ensureGlobal();
+  await initLocal();
+}
+
+async function ensureGlobal() {
+  if (existsSync(GLOBAL_PUNA_DIR)) {
+    console.log(`Using global config at ${GLOBAL_PUNA_DIR}`);
+    return;
+  }
+
+  console.log(`Global config missing at ${GLOBAL_PUNA_DIR}. Bootstrapping...`);
+  await initGlobal();
+}
+
+async function initGlobal() {
+  if (existsSync(GLOBAL_PUNA_DIR)) {
+    console.log(`${GLOBAL_PUNA_DIR} already exists. Skipping (idempotent).`);
+    return;
+  }
+
+  await mkdir(join(GLOBAL_PUNA_DIR, "agents"), { recursive: true });
+
+  for (const name of AGENTS) {
+    const srcDir = join(TEMPLATES_DIR, "agents", name);
+    const destDir = join(GLOBAL_PUNA_DIR, "agents", name);
+    await mkdir(destDir, { recursive: true });
+    const conf = await readFile(join(srcDir, "conf.json"), "utf8");
+    const prompt = await readFile(join(srcDir, "prompt.md"), "utf8");
+    await writeFile(join(destDir, "conf.json"), conf);
+    await writeFile(join(destDir, "prompt.md"), prompt);
+  }
+
+  console.log(`Initialized global puna config at ${resolve(GLOBAL_PUNA_DIR)}`);
+  console.log(`  Agents: ${AGENTS.join(", ")}`);
+}
+
+async function initLocal() {
+  const root = join(process.cwd(), PUNA_DIR);
 
   if (existsSync(root)) {
     console.error(`.puna/ already exists at ${root}. Nothing to do.`);
@@ -16,12 +67,11 @@ export async function init(_args) {
   }
 
   await mkdir(join(root, "docs/plan"), { recursive: true });
-  await mkdir(join(root, "agents"), { recursive: true });
-  await mkdir(join(root, "skills"), { recursive: true });
 
   const config = {
     id: workspaceId(),
     version: CONFIG_VERSION,
+    globalConfigDir: GLOBAL_PUNA_DIR,
   };
   await writeFile(
     join(root, "config.json"),
@@ -42,13 +92,22 @@ export async function init(_args) {
       "",
       "## Layout",
       "",
-      "- `config.json` — workspace id (persistent identity) + schema version",
-      "- `docs/plan/<name>.md` — plan spec",
+      "- `config.json` — workspace id + global config reference",
+      "- `docs/plan/<name>.md` — plan spec (project-local)",
       "- `docs/plan/<name>.progress.md` — live progress log",
-      "- `agents/<name>/prompt.md` — agent system prompt",
-      "- `agents/<name>/config.json` — agent runtime config",
-      "- `skills/<name>/desc.md` — skill description",
-      "- `skills/<name>/scripts/<script>.{js,py}` — skill scripts",
+      "- `agents/<name>/` — local agent override (optional, not auto-created)",
+      "- `skills/<name>/` — local skill override (optional, not auto-created)",
+      "",
+      "## Resolution Order",
+      "",
+      "Agents and skills are resolved by name from BOTH:",
+      "",
+      "1. `./.puna/agents/<name>/` — local override (if exists)",
+      "2. `~/.config/.puna/agents/<name>/` — global default",
+      "",
+      "Same name = local wins. Different name = both loaded (additive).",
+      "By default, projects inherit agents/skills from global config.",
+      "To add a local override, just create the directory.",
       "",
       "Run `puna serve` from anywhere inside this workspace to start the harness.",
       "",
@@ -57,7 +116,9 @@ export async function init(_args) {
 
   console.log(`Initialized .puna/ at ${resolve(root)}`);
   console.log(`  workspace_id: ${config.id}`);
+  console.log(`  global_config: ${GLOBAL_PUNA_DIR}`);
   console.log("");
-  console.log("Next: edit .puna/agents/, .puna/skills/, .puna/docs/plan/");
+  console.log("Next: create .puna/docs/plan/<name>.md to start a plan.");
+  console.log("Optional: add .puna/agents/<name>/ to override global defaults.");
   console.log("Then run `puna serve`.");
 }
