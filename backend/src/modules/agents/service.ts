@@ -14,6 +14,8 @@ interface AgentConf {
 	called?: string;
 	tools?: { allow?: string[]; deny?: string[] };
 	description?: string;
+	providerId?: string;
+	modelId?: string;
 }
 
 export class AgentNotFoundError extends Error {
@@ -62,6 +64,8 @@ export class AgentService {
 			tools: conf.tools
 				? { allow: conf.tools.allow ?? [], deny: conf.tools.deny ?? [] }
 				: null,
+			providerId: conf.providerId ?? null,
+			modelId: conf.modelId ?? null,
 			prompt,
 		};
 	}
@@ -78,6 +82,8 @@ export class AgentService {
 			tools: conf.tools
 				? { allow: conf.tools.allow ?? [], deny: conf.tools.deny ?? [] }
 				: null,
+			providerId: conf.providerId ?? null,
+			modelId: conf.modelId ?? null,
 		};
 	}
 

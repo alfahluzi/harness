@@ -117,8 +117,8 @@ export function buildMcpServer() {
 				"the same conversation thread (two-way chat with a sub-agent).",
 			inputSchema: SendMessageInput.shape,
 		},
-		async ({ id, message }) => {
-			const result = await sessionService.sendMessage(id, message);
+		async ({ id, message, configDir }) => {
+			const result = await sessionService.sendMessage(id, message, configDir);
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);

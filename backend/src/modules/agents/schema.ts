@@ -23,6 +23,8 @@ export const AgentSummary = z
 		temperature: z.number().nullable(),
 		called: z.string().nullable(),
 		tools: ToolsSchema.nullable(),
+		providerId: z.string().nullable(),
+		modelId: z.string().nullable(),
 	})
 	.openapi("AgentSummary");
 export type AgentSummary = z.infer<typeof AgentSummary>;
@@ -46,6 +48,8 @@ export const AgentDetailResponse = z
 		temperature: z.number().nullable(),
 		called: z.string().nullable(),
 		tools: ToolsSchema.nullable(),
+		providerId: z.string().nullable(),
+		modelId: z.string().nullable(),
 		prompt: z.string(),
 	})
 	.openapi("AgentDetailResponse");

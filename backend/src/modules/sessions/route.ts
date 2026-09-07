@@ -26,6 +26,7 @@ const CreateSessionSchema = z
 		prompt: z.string().min(1),
 		agentProfile: z.string().default("main-agent"),
 		background: z.boolean().default(true),
+		configDir: z.string().min(1),
 	})
 	.openapi("CreateSessionInput");
 
@@ -38,7 +39,7 @@ const SessopmIdParamSchema = z
 	.openapi("SessionIdParam");
 
 const SendMessageSchema = z
-	.object({ message: z.string().min(1) })
+	.object({ message: z.string().min(1), configDir: z.string().min(1) })
 	.openapi("SendMessageInput");
 
 const NotFoundSchema = z.object({ error: z.string() }).openapi("NotFound");
@@ -180,9 +181,9 @@ app.openapi(resultRouteDef, async (c) => {
 
 app.openapi(messageRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
-	const { message } = c.req.valid("json");
+	const { message, configDir } = c.req.valid("json");
 	try {
-		return c.json(await sessionService.sendMessage(id, message), 200);
+		return c.json(await sessionService.sendMessage(id, message, configDir), 200);
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);

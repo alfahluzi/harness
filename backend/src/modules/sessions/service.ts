@@ -1,14 +1,15 @@
 import { Client } from "@langchain/langgraph-sdk";
 import { config } from "../../global/config";
+import { resolveAgentRuntimeConfig } from "../../global/agent-runtime";
 import { SessionRepository, type SessionRecord } from "./repository";
 
 export class SessionService {
-	private client: Client;
+	private langgraph_client: Client;
 	private repo: SessionRepository;
 	private activeCount = new Map<string, number>();
 
 	constructor(repo: SessionRepository = new SessionRepository()) {
-		this.client = new Client({ apiUrl: config.langgraphUrl });
+		this.langgraph_client = new Client({ apiUrl: config.langgraphUrl });
 		this.repo = repo;
 	}
 
@@ -19,8 +20,9 @@ export class SessionService {
 		prompt: string;
 		agentProfile: string;
 		background: boolean;
+		configDir: string;
 	}) {
-		const child = await this.client.threads.create();
+		const child = await this.langgraph_client.threads.create();
 		const sessionId = `bg_${crypto.randomUUID().slice(0, 8)}`;
 		const createdAt = Date.now();
 
@@ -33,6 +35,7 @@ export class SessionService {
 			runId: "",
 			agentProfile: opts.agentProfile,
 			background: opts.background,
+			configDir: opts.configDir,
 			status: "pending",
 			createdAt,
 		};
@@ -42,10 +45,19 @@ export class SessionService {
 		if (!opts.background) {
 			record.status = "running";
 			this.repo.setStatus(sessionId, "running");
-			const run = await this.client.runs.wait(child.thread_id, config.graphId, {
-				input: { messages: [{ role: "human", content: opts.prompt }] },
-				config: { configurable: { agent_profile: opts.agentProfile } },
-			});
+			const runtime = await resolveAgentRuntimeConfig(
+				opts.configDir,
+				opts.agentProfile,
+				opts.workspaceId,
+			);
+			const run = await this.langgraph_client.runs.wait(
+				child.thread_id,
+				config.graphId,
+				{
+					input: { messages: [{ role: "human", content: opts.prompt }] },
+					config: runtime,
+				},
+			);
 			record.status = "completed";
 			record.completedAt = Date.now();
 			record.result = run;
@@ -87,12 +99,17 @@ export class SessionService {
 		this.repo.setStatus(record.id, "running");
 
 		try {
-			const run = await this.client.runs.create(
+			const runtime = await resolveAgentRuntimeConfig(
+				record.configDir,
+				record.agentProfile,
+				record.workspaceId,
+			);
+			const run = await this.langgraph_client.runs.create(
 				record.childThreadId,
 				config.graphId,
 				{
 					input: { messages: [{ role: "human", content: prompt }] },
-					config: { configurable: { agent_profile: record.agentProfile } },
+					config: runtime,
 				},
 			);
 			record.runId = run.run_id;
@@ -100,7 +117,9 @@ export class SessionService {
 
 			await this.waitForCompletion(record);
 
-			const state = await this.client.threads.getState(record.childThreadId);
+			const state = await this.langgraph_client.threads.getState(
+				record.childThreadId,
+			);
 			record.status = "completed";
 			record.completedAt = Date.now();
 			record.result = state.values;
@@ -122,7 +141,7 @@ export class SessionService {
 
 	private async waitForCompletion(record: SessionRecord) {
 		try {
-			for await (const _chunk of this.client.runs.joinStream(
+			for await (const _chunk of this.langgraph_client.runs.joinStream(
 				record.childThreadId,
 				record.runId,
 			)) {
@@ -130,7 +149,7 @@ export class SessionService {
 			}
 		} catch {
 			while (true) {
-				const run = await this.client.runs.get(
+				const run = await this.langgraph_client.runs.get(
 					record.childThreadId,
 					record.runId,
 				);
@@ -151,14 +170,18 @@ export class SessionService {
 
 		const notification = this.renderReminder(record, siblingsStillRunning);
 
-		await this.client.threads.updateState(record.parentThreadId, {
+		await this.langgraph_client.threads.updateState(record.parentThreadId, {
 			values: { messages: [{ role: "system", content: notification }] },
 		});
 
 		if (!siblingsStillRunning) {
-			await this.client.runs.create(record.parentThreadId, config.graphId, {
-				input: null,
-			});
+			await this.langgraph_client.runs.create(
+				record.parentThreadId,
+				config.graphId,
+				{
+					input: null,
+				},
+			);
 		}
 	}
 
@@ -193,12 +216,21 @@ export class SessionService {
 		return { status: r.status, result: r.result };
 	}
 
-	async sendMessage(id: string, message: string) {
+	async sendMessage(id: string, message: string, configDir: string) {
 		const r = this.repo.getOrThrow(id);
-		const run = await this.client.runs.wait(r.childThreadId, config.graphId, {
-			input: { messages: [{ role: "human", content: message }] },
-			config: { configurable: { agent_profile: r.agentProfile } },
-		});
+		const runtime = await resolveAgentRuntimeConfig(
+			configDir,
+			r.agentProfile,
+			r.workspaceId,
+		);
+		const run = await this.langgraph_client.runs.wait(
+			r.childThreadId,
+			config.graphId,
+			{
+				input: { messages: [{ role: "human", content: message }] },
+				config: runtime,
+			},
+		);
 		this.repo.setResult(id, run, Date.now());
 		return run;
 	}
@@ -206,9 +238,11 @@ export class SessionService {
 	async delete(id: string) {
 		const r = this.repo.getOrThrow(id);
 		if (r.status === "running" && r.runId) {
-			await this.client.runs.cancel(r.childThreadId, r.runId).catch(() => {});
+			await this.langgraph_client.runs
+				.cancel(r.childThreadId, r.runId)
+				.catch(() => {});
 		}
-		await this.client.threads.delete(r.childThreadId).catch(() => {});
+		await this.langgraph_client.threads.delete(r.childThreadId).catch(() => {});
 		this.repo.delete(id);
 	}
 

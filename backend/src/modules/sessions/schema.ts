@@ -7,6 +7,7 @@ export const CreateSessionInput = z.object({
 	prompt: z.string().min(1),
 	agentProfile: z.string().default("main-agent"),
 	background: z.boolean().default(true),
+	configDir: z.string().min(1),
 });
 
 export const SessionIdInput = z.object({
@@ -16,4 +17,5 @@ export const SessionIdInput = z.object({
 export const SendMessageInput = z.object({
 	id: z.string(),
 	message: z.string().min(1),
+	configDir: z.string().min(1),
 });

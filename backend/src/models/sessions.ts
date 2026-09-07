@@ -11,6 +11,7 @@ export const sessions = sqliteTable(
 		runId: text("run_id"),
 		agentProfile: text("agent_profile").notNull(),
 		background: integer("background", { mode: "boolean" }).notNull(),
+		configDir: text("config_dir").notNull().default(""),
 		status: text("status").notNull(),
 		createdAt: integer("created_at").notNull(),
 		completedAt: integer("completed_at"),
