@@ -3,7 +3,7 @@ import { Annotation, LangGraphRunnableConfig } from "@langchain/langgraph";
 const DEFAULT_USER_ID = "default";
 const DEFAULT_SYSTEM_PROMPT =
 	"You are a helpful assistant with memory. Use the available tools to store memories about the user when they share personal information. Always respond in the same language the user uses.";
-const DEFAULT_AGENT_NAME = "main-agent";
+const DEFAULT_AGENT_NAME = "semar";
 const DEFAULT_PROVIDER_NAME = "openrouter";
 const DEFAULT_PROVIDER_URL = "https://9router.ljosalfar.cloud/v1";
 const DEFAULT_API_KEY = "sk-c4f4e23515e229a5-fijmyr-fc1cda87";

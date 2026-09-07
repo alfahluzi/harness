@@ -1,5 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { sqliteDb } from "../../global/db";
+import { GLOBAL_WORKSPACE_ID } from "../../models/providers";
 
 export interface ProviderModelRecord {
 	workspaceId: string;
@@ -20,6 +21,7 @@ interface ProviderModelRow {
 interface Stmts {
 	replaceAll: Statement;
 	listByProvider: Statement;
+	listByModel: Statement;
 	countByProvider: Statement;
 	deleteByProvider: Statement;
 }
@@ -37,6 +39,12 @@ function prepare(db: Database): Stmts {
 			  FROM provider_models
 			 WHERE workspace_id = ? AND provider_id = ?
 			 ORDER BY model_id ASC
+		`),
+		listByModel: db.prepare(`
+			SELECT DISTINCT provider_id
+			  FROM provider_models
+			 WHERE workspace_id = ? AND model_id = ?
+			 ORDER BY provider_id ASC
 		`),
 		countByProvider: db.prepare(`
 			SELECT COUNT(*) AS count
@@ -80,6 +88,30 @@ export class ProviderModelRepository {
 				createdAt: row.created_at,
 			}),
 		);
+	}
+
+	/**
+	 * All (workspace, provider) pairs that expose `modelId`, local rows before
+	 * global rows so callers can apply local-wins without re-sorting.
+	 */
+	listProvidersByModel(
+		workspaceId: string,
+		modelId: string,
+	): Array<{ workspaceId: string; providerId: string }> {
+		const localRows = this.stmts.listByModel.all(workspaceId, modelId) as Array<{
+			provider_id: string;
+		}>;
+		const globalRows = this.stmts.listByModel.all(
+			GLOBAL_WORKSPACE_ID,
+			modelId,
+		) as Array<{ provider_id: string }>;
+		return [
+			...localRows.map((r) => ({ workspaceId, providerId: r.provider_id })),
+			...globalRows.map((r) => ({
+				workspaceId: GLOBAL_WORKSPACE_ID,
+				providerId: r.provider_id,
+			})),
+		];
 	}
 
 	countByProvider(workspaceId: string, providerId: string): number {

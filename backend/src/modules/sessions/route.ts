@@ -1,6 +1,8 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { SessionService } from "./service";
 import { SessionNotFoundError } from "./repository";
+import { AgentRuntimeError } from "../../global/agent-runtime";
+import { StreamMessageInput } from "./schema";
 
 const sessionService = new SessionService();
 
@@ -24,9 +26,10 @@ const CreateSessionSchema = z
 		parent: z.string().optional(),
 		description: z.string().min(1),
 		prompt: z.string().min(1),
-		agentProfile: z.string().default("main-agent"),
+		agentProfile: z.string().default("semar"),
 		background: z.boolean().default(true),
 		configDir: z.string().min(1),
+		model: z.string().optional(),
 	})
 	.openapi("CreateSessionInput");
 
@@ -39,7 +42,12 @@ const SessopmIdParamSchema = z
 	.openapi("SessionIdParam");
 
 const SendMessageSchema = z
-	.object({ message: z.string().min(1), configDir: z.string().min(1) })
+	.object({
+		message: z.string().min(1),
+		configDir: z.string().min(1),
+		agentProfile: z.string().optional(),
+		model: z.string().optional(),
+	})
 	.openapi("SendMessageInput");
 
 const NotFoundSchema = z.object({ error: z.string() }).openapi("NotFound");
@@ -128,6 +136,47 @@ const messageRouteDef = createRoute({
 	tags: ["sessions"],
 });
 
+const streamRouteDef = createRoute({
+	method: "post",
+	path: "/sessions/:id/stream",
+	request: {
+		params: SessopmIdParamSchema,
+		body: { content: { "application/json": { schema: StreamMessageInput } } },
+	},
+	responses: {
+		200: {
+			description: "SSE stream of run events",
+			content: { "text/event-stream": { schema: z.any() } },
+		},
+		400: {
+			description: "Agent/config error",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+		404: {
+			description: "Session not found",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+	},
+	tags: ["sessions"],
+});
+
+const messagesRouteDef = createRoute({
+	method: "get",
+	path: "/sessions/:id/messages",
+	request: { params: SessopmIdParamSchema },
+	responses: {
+		200: {
+			description: "Session message history",
+			content: { "application/json": { schema: z.any() } },
+		},
+		404: {
+			description: "Session not found",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+	},
+	tags: ["sessions"],
+});
+
 const deleteRouteDef = createRoute({
 	method: "delete",
 	path: "/sessions/:id",
@@ -181,9 +230,81 @@ app.openapi(resultRouteDef, async (c) => {
 
 app.openapi(messageRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
-	const { message, configDir } = c.req.valid("json");
+	const { message, configDir, agentProfile, model } = c.req.valid("json");
 	try {
-		return c.json(await sessionService.sendMessage(id, message, configDir), 200);
+		return c.json(
+			await sessionService.sendMessage(id, message, configDir, {
+				agentProfile,
+				model,
+			}),
+			200,
+		);
+	} catch (e) {
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
+		throw e;
+	}
+});
+
+app.openapi(streamRouteDef, async (c) => {
+	const { id } = c.req.valid("param");
+	const { message, configDir, agentProfile, model } = c.req.valid("json");
+
+	let gen: Awaited<ReturnType<SessionService["streamMessage"]>>;
+	try {
+		gen = await sessionService.streamMessage(
+			id,
+			message,
+			configDir,
+			c.req.raw.signal,
+			{ agentProfile, model },
+		);
+	} catch (e) {
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
+		if (e instanceof AgentRuntimeError)
+			return c.json({ error: e.message }, 400);
+		throw e;
+	}
+
+	const encoder = new TextEncoder();
+	const stream = new ReadableStream<Uint8Array>({
+		async start(controller) {
+			try {
+				for await (const part of gen) {
+					controller.enqueue(
+						encoder.encode(`data: ${JSON.stringify(part)}\n\n`),
+					);
+				}
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({ type: "__end__" })}\n\n`,
+					),
+				);
+			} catch {
+				// connection broken / stream error — close without sending __end__
+			} finally {
+				controller.close();
+			}
+		},
+		cancel() {
+			void gen.return?.(undefined as never);
+		},
+	});
+
+	return new Response(stream, {
+		headers: {
+			"content-type": "text/event-stream",
+			"cache-control": "no-cache",
+			connection: "keep-alive",
+		},
+	});
+});
+
+app.openapi(messagesRouteDef, async (c) => {
+	const { id } = c.req.valid("param");
+	try {
+		return c.json(await sessionService.getMessages(id), 200);
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);

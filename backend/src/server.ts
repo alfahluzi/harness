@@ -64,9 +64,26 @@ app.openapi(healthRoute, (c) =>
 	c.json({ status: "ok", uptime: process.uptime() }, 200),
 );
 
-app.doc("/doc", {
-	openapi: "3.0.0",
-	info: { title: "backend", version: "0.1.0", description: "Hono API" },
+// @hono/zod-openapi's `.route()` fails to convert `:param` -> `{param}` for
+// routes inside mounted sub-apps, so the raw OpenAPI document uses Hono-style
+// colon paths (`/providers/:id`). The frontend @hey-api client only substitutes
+// curly-brace params (`{id}`), so those colon paths break path interpolation
+// (requests go out as literal `/providers/:id` -> 404). Normalize here.
+function toCurlyPathParams(path: string): string {
+	return path.replaceAll(/:([^/]+)/g, "{$1}");
+}
+
+// Replace app.doc() with a route that normalizes path params to OpenAPI
+// curly-brace syntax before serving the spec.
+app.get("/doc", (c) => {
+	const document = app.getOpenAPIDocument({
+		openapi: "3.0.0",
+		info: { title: "backend", version: "0.1.0", description: "Hono API" },
+	});
+	document.paths = Object.fromEntries(
+		Object.entries(document.paths).map(([p, v]) => [toCurlyPathParams(p), v]),
+	);
+	return c.json(document);
 });
 
 // REST surface for SessionService (debug / frontend use)

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getApiAgents, getApiAgentsName } from "@/lib/api";
+import { getApiAgents, getApiAgentsByName } from "@/lib/api";
 import { useActiveWorkdir } from "./use-active-workdir";
 
 const STALE_MS = 30_000;
@@ -21,7 +21,7 @@ export function useAgent(name: string | null) {
 		queryKey: ["agent", configDir, name],
 		queryFn: () => {
 			if (!name) throw new Error("name required");
-			return getApiAgentsName({
+			return getApiAgentsByName({
 				path: { name },
 				query: { configDir },
 				throwOnError: true,

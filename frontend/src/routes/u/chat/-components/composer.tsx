@@ -1,6 +1,9 @@
 import { PlusIcon, SendIcon, StopCircle } from "lucide-react";
 import type { KeyboardEvent, RefObject } from "react";
+import { AgentModelSelect } from "./agent-model-select";
 import { ComposerButton } from "./composer-button";
+import type { AgentProfile } from "../-hooks/use-agent-model";
+import type { ProviderModel } from "@/lib/api";
 
 const MAX_HEIGHT = 200;
 
@@ -16,6 +19,14 @@ export type ComposerProps = {
 	canSubmit: boolean;
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 	onAutoResize: () => void;
+	agentProfile: string;
+	model: string;
+	agents: AgentProfile[];
+	models: ProviderModel[];
+	onAgentChange: (name: string) => void;
+	onModelChange: (modelId: string) => void;
+	modelStatus: string | null;
+	isLoadingAgents: boolean;
 };
 
 export function Composer({
@@ -30,6 +41,14 @@ export function Composer({
 	canSubmit,
 	textareaRef,
 	onAutoResize,
+	agentProfile,
+	model,
+	agents,
+	models,
+	onAgentChange,
+	onModelChange,
+	modelStatus,
+	isLoadingAgents,
 }: ComposerProps) {
 	const note = error ?? info;
 
@@ -55,6 +74,7 @@ export function Composer({
 						{note}
 					</div>
 				)}
+
 				<textarea
 					ref={textareaRef}
 					value={text}
@@ -65,10 +85,24 @@ export function Composer({
 					style={{ maxHeight: `${MAX_HEIGHT}px` }}
 					className="border-b border-neutral-300 dark:border-neutral-800 w-full focus:outline-none p-2 px-4 text-xs bg-transparent resize-none"
 				/>
-				<div className="flex px-2 pb-1 justify-between">
-					<ComposerButton>
-						<PlusIcon className="text-neutral-400" size={20} />
-					</ComposerButton>
+
+				<div className="flex items-center justify-between gap-2 px-2 pb-1">
+					<div className="flex items-center gap-1">
+						<AgentModelSelect
+							agentProfile={agentProfile}
+							model={model}
+							agents={agents}
+							models={models}
+							onAgentChange={onAgentChange}
+							onModelChange={onModelChange}
+							modelStatus={modelStatus}
+							isLoadingAgents={isLoadingAgents}
+						/>
+						<ComposerButton>
+							<PlusIcon className="text-neutral-400" size={20} />
+						</ComposerButton>
+					</div>
+
 					{isPending ? (
 						<ComposerButton onClick={onStop}>
 							<StopCircle

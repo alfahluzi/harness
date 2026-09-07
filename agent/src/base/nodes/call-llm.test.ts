@@ -91,7 +91,7 @@ test("callModel: end-to-end vs mock OpenAI server", async () => {
 // Test 2 — ensureConfiguration defaults (pure unit, without server)
 test("ensureConfiguration: defaults", () => {
 	const cfg: any = ensureConfiguration({} as any);
-	assert.equal(cfg.agentName, "main-agent");
+	assert.equal(cfg.agentName, "semar");
 	assert.equal(cfg.providerName, "openrouter");
 	assert.equal(cfg.modelName, "ocg/deepseek-v4-flash");
 	assert.equal(cfg.providerUrl, "https://9router.ljosalfar.cloud/v1");

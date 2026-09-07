@@ -5,9 +5,10 @@ export const CreateSessionInput = z.object({
 	parent: z.string().optional(),
 	description: z.string().min(1),
 	prompt: z.string().min(1),
-	agentProfile: z.string().default("main-agent"),
+	agentProfile: z.string().default("semar"),
 	background: z.boolean().default(true),
 	configDir: z.string().min(1),
+	model: z.string().optional(),
 });
 
 export const SessionIdInput = z.object({
@@ -18,4 +19,13 @@ export const SendMessageInput = z.object({
 	id: z.string(),
 	message: z.string().min(1),
 	configDir: z.string().min(1),
+	agentProfile: z.string().optional(),
+	model: z.string().optional(),
+});
+
+export const StreamMessageInput = z.object({
+	message: z.string().min(1),
+	configDir: z.string().min(1),
+	agentProfile: z.string().optional(),
+	model: z.string().optional(),
 });

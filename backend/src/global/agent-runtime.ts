@@ -1,7 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ProviderRepository } from "../modules/providers/provider-repository";
+import {
+	ProviderRepository,
+	type ProviderRecord,
+} from "../modules/providers/provider-repository";
+import { ProviderModelRepository } from "../modules/providers/repository";
 import { GLOBAL_WORKSPACE_ID } from "../models/providers";
+import {
+	loadWorkspaceContext,
+	InvalidWorkspaceError,
+} from "./workspace-context";
+import { resolveSource } from "./workspace-scanner";
 
 export class AgentRuntimeError extends Error {}
 
@@ -21,46 +30,112 @@ interface AgentConf {
 	modelId?: string;
 }
 
-async function readProfile(
-	configDir: string,
-	agentProfile: string,
-): Promise<{ prompt: string; conf: AgentConf }> {
-	const dir = join(configDir, "agents", agentProfile);
-	const prompt = await readFile(join(dir, "prompt.md"), "utf8");
+async function readProfile(dir: string): Promise<{ prompt: string; conf: AgentConf }> {
+	let prompt: string;
+	try {
+		prompt = await readFile(join(dir, "prompt.md"), "utf8");
+	} catch {
+		// prompt.md is the layer marker, so it should exist; surface a clear
+		// error instead of a raw ENOENT 500 if it somehow fails to read.
+		throw new AgentRuntimeError(`failed to read agent profile: ${dir}`);
+	}
 	let conf: AgentConf = {};
 	try {
-		conf = JSON.parse(
-			await readFile(join(dir, "conf.json"), "utf8"),
-		) as AgentConf;
+		conf = JSON.parse(await readFile(join(dir, "conf.json"), "utf8")) as AgentConf;
 	} catch {
 		conf = {};
 	}
 	return { prompt, conf };
 }
 
+function firstConnectedProvider(
+	repo: ProviderRepository,
+	workspaceId: string,
+): ProviderRecord | null {
+	const rows = repo.listForWorkspace(workspaceId);
+	// local wins: row workspace lebih berhak daripada row global untuk id sama
+	const byId = new Map<string, ProviderRecord>();
+	for (const r of rows) {
+		const existing = byId.get(r.id);
+		if (!existing || existing.workspaceId !== GLOBAL_WORKSPACE_ID) {
+			byId.set(r.id, r);
+		}
+	}
+	return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id))[0] ?? null;
+}
+
+function firstModelForProvider(
+	modelRepo: ProviderModelRepository,
+	provider: ProviderRecord,
+): string | null {
+	const records = modelRepo.listByProvider(provider.workspaceId, provider.id);
+	return records[0]?.modelId ?? null;
+}
+
 export async function resolveAgentRuntimeConfig(
 	configDir: string,
 	agentProfile: string,
-	workspaceId: string,
 	repo: ProviderRepository = new ProviderRepository(),
+	opts?: { model?: string },
+	modelRepo: ProviderModelRepository = new ProviderModelRepository(),
 ): Promise<AgentRuntimeConfig> {
-	const { prompt, conf } = await readProfile(configDir, agentProfile);
-
-	const providerId = conf.providerId?.trim();
-	if (!providerId) {
-		throw new AgentRuntimeError(
-			`agent profile ${agentProfile} missing providerId`,
-		);
+	let ctx;
+	try {
+		ctx = await loadWorkspaceContext(configDir, configDir);
+	} catch (e) {
+		if (e instanceof InvalidWorkspaceError) {
+			throw new AgentRuntimeError(`invalid workspace: ${e.message}`);
+		}
+		throw e;
 	}
 
-	const provider =
-		repo.get(providerId, workspaceId) ??
-		repo.get(providerId, GLOBAL_WORKSPACE_ID);
-	if (!provider) {
-		throw new AgentRuntimeError(`provider not connected: ${providerId}`);
+	const localDir = join(configDir, "agents");
+	const globalDir = ctx.globalConfigDir
+		? join(ctx.globalConfigDir, "agents")
+		: null;
+	const resolved = resolveSource(localDir, globalDir, agentProfile, "prompt.md");
+	if (!resolved) {
+		throw new AgentRuntimeError(`agent profile not found: ${agentProfile}`);
 	}
 
-	const modelName = conf.modelId?.trim() || provider.defaultModel;
+	const { prompt, conf } = await readProfile(resolved.dir);
+
+	const confProviderId = conf.providerId?.trim();
+	let provider: ProviderRecord | null = null;
+	if (confProviderId) {
+		provider =
+			repo.get(confProviderId, ctx.id) ??
+			repo.get(confProviderId, GLOBAL_WORKSPACE_ID);
+		if (!provider) {
+			throw new AgentRuntimeError(`provider not connected: ${confProviderId}`);
+		}
+	} else {
+		// Agent tidak declare providerId: resolve dari model yang dikirim,
+		// lalu fallback ke provider pertama yang connect.
+		const modelName = opts?.model?.trim() || conf.modelId?.trim();
+		if (modelName) {
+			const hits = modelRepo.listProvidersByModel(ctx.id, modelName);
+			for (const hit of hits) {
+				const candidate = repo.get(hit.providerId, hit.workspaceId);
+				if (candidate) {
+					provider = candidate;
+					break;
+				}
+			}
+		}
+		if (!provider) provider = firstConnectedProvider(repo, ctx.id);
+		if (!provider) {
+			throw new AgentRuntimeError(
+				`agent profile ${agentProfile} missing providerId and no provider is connected`,
+			);
+		}
+	}
+
+	const requestedModel = opts?.model?.trim() || conf.modelId?.trim();
+	const modelName =
+		requestedModel ||
+		firstModelForProvider(modelRepo, provider) ||
+		provider.defaultModel;
 
 	return {
 		configurable: {

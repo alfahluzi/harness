@@ -18,6 +18,7 @@ export interface SessionRecord {
 	agentProfile: string;
 	background: boolean;
 	configDir: string;
+	model?: string;
 	status: SessionStatus;
 	createdAt: number;
 	completedAt?: number;
@@ -35,6 +36,7 @@ interface SessionRow {
 	agent_profile: string;
 	background: number;
 	config_dir: string;
+	model: string | null;
 	status: SessionStatus;
 	created_at: number;
 	completed_at: number | null;
@@ -53,6 +55,7 @@ function rowToRecord(row: SessionRow): SessionRecord {
 		agentProfile: row.agent_profile,
 		background: row.background === 1,
 		configDir: row.config_dir,
+		model: row.model ?? undefined,
 		status: row.status,
 		createdAt: row.created_at,
 		completedAt: row.completed_at ?? undefined,
@@ -79,8 +82,8 @@ function prepare(db: Database): Stmts {
 		insert: db.prepare(`
 			INSERT INTO sessions (
 				id, workspace_id, description, parent_thread_id, child_thread_id, run_id,
-				agent_profile, background, config_dir, status, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				agent_profile, background, config_dir, model, status, created_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`),
 		get: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
 		list: db.prepare(`
@@ -136,6 +139,7 @@ export class SessionRepository {
 			session.agentProfile,
 			session.background ? 1 : 0,
 			session.configDir,
+			session.model ?? null,
 			session.status,
 			session.createdAt,
 		);

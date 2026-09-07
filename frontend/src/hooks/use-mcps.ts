@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
-	deleteApiMcpsInstalledName,
+	deleteApiMcpsInstalledByName,
 	getApiMcpsInstalled,
-	getApiMcpsInstalledName,
-	getApiMcpsRegistryName,
+	getApiMcpsInstalledByName,
+	getApiMcpsRegistryByName,
 	getApiMcpsSearch,
 	postApiMcpsInstall,
 } from "@/lib/api";
@@ -38,7 +38,7 @@ export function usePublicMcpDetail(name: string | null) {
 		queryKey: ["mcp-public-detail", name],
 		queryFn: () => {
 			if (!name) throw new Error("name required");
-			return getApiMcpsRegistryName({ path: { name }, throwOnError: true }).then((r) => r.data);
+			return getApiMcpsRegistryByName({ path: { name }, throwOnError: true }).then((r) => r.data);
 		},
 		enabled: !!name,
 		staleTime: STALE_MS,
@@ -63,7 +63,7 @@ export function useInstalledMcpDetail(name: string | null) {
 		queryKey: ["installed-mcp-detail", configDir, name],
 		queryFn: () => {
 			if (!name) throw new Error("name required");
-			return getApiMcpsInstalledName({
+			return getApiMcpsInstalledByName({
 				path: { name },
 				query: { configDir },
 				throwOnError: true,
@@ -91,7 +91,7 @@ export function useUninstallMcp() {
 	const qc = useQueryClient();
 	return useMutation({
 		mutationFn: (name: string) =>
-			deleteApiMcpsInstalledName({
+			deleteApiMcpsInstalledByName({
 				path: { name },
 				query: { configDir },
 				throwOnError: true,

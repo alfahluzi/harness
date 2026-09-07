@@ -1,13 +1,15 @@
+import type { ChatMessage } from "@/lib/chat-types";
+
 type MessageHumanProps = {
-	msg: {
-		role: string;
-		content: string;
-	};
+	msg: ChatMessage;
 };
+
 export function MessageHuman({ msg }: MessageHumanProps) {
 	return (
-		<div className="border border-neutral-700 rounded-lg px-2 py-1 bg-neutral-800 ml-auto w-fit max-w-11/12 wrap-break-word">
-			{msg.content}
+		<div className="flex w-full justify-end">
+			<div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-neutral-800 px-4 py-2.5 text-sm text-neutral-100">
+				<p className="whitespace-pre-wrap break-words">{msg.content}</p>
+			</div>
 		</div>
 	);
 }

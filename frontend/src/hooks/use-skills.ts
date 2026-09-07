@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getApiSkills, getApiSkillsName } from "@/lib/api";
+import { getApiSkills, getApiSkillsByName } from "@/lib/api";
 import { useActiveWorkdir } from "./use-active-workdir";
 
 const STALE_MS = 30_000;
@@ -21,7 +21,7 @@ export function useSkill(name: string | null) {
 		queryKey: ["skill", configDir, name],
 		queryFn: () => {
 			if (!name) throw new Error("name required");
-			return getApiSkillsName({
+			return getApiSkillsByName({
 				path: { name },
 				query: { configDir },
 				throwOnError: true,

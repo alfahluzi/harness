@@ -1,11 +1,16 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { useActiveWorkdir } from "../../../../hooks/use-active-workdir";
 import { useSessions } from "../../../../hooks/use-sessions";
 import type { SessionSummary } from "@/lib/api";
+import type { ChatMessage } from "@/lib/chat-types";
 import { ChatRequest } from "./chat-request";
 
 type ChatPanelProps = {
 	sessionId?: string;
+	messages: ChatMessage[];
+	isStreaming: boolean;
+	streamContent: string;
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -20,17 +25,32 @@ function statusDotClass(status: string): string {
 	return STATUS_DOT[status] ?? STATUS_DOT.cancelled!;
 }
 
-export function ChatPanel({ sessionId }: ChatPanelProps) {
+export function ChatPanel({
+	sessionId,
+	messages,
+	isStreaming,
+	streamContent,
+}: ChatPanelProps) {
 	const { configDir } = useActiveWorkdir();
 	const sessions = useSessions();
+	const scrollRef = useRef<HTMLDivElement>(null);
 
 	const session = sessionId
 		? sessions.data?.find((s) => s.id === sessionId)
 		: undefined;
 
+	useEffect(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+	}, [messages, streamContent]);
+
 	return (
-		<div className="h-full w-full flex flex-col gap-2 items-center justify-start my-2 overflow-y-auto scrollbar-thin">
-			<header className="sticky top-0 z-10 w-full max-w-190 px-4 py-2 bg-neutral-50/90 dark:bg-neutral-950/90 backdrop-blur">
+		<div
+			ref={scrollRef}
+			className="h-full w-full flex flex-col gap-2 items-center justify-start my-2 overflow-y-auto scrollbar-thin"
+		>
+			<header className="sticky top-0 z-10 w-full max-w-3xl px-4 py-2 bg-neutral-50/90 dark:bg-neutral-950/90 backdrop-blur">
 				{!configDir ? (
 					<WorkspaceGuard />
 				) : sessionId && session ? (
@@ -42,7 +62,9 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
 					</div>
 				) : (
 					<div className="flex flex-col gap-0.5">
-						<h1 className="font-medium text-neutral-900 dark:text-neutral-100">New chat</h1>
+						<h1 className="font-medium text-neutral-900 dark:text-neutral-100">
+							New chat
+						</h1>
 						<p className="text-xs text-neutral-500 dark:text-neutral-400">
 							Start a chat by sending a message below.
 						</p>
@@ -50,18 +72,19 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
 				)}
 			</header>
 
-			{sessionId ? (
-				<div className="max-w-190 w-full px-4">
+			<div className="max-w-3xl w-full px-4 flex-1">
+				{sessionId && (
 					<div className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
 						Session {sessionId.slice(0, 8)}
 					</div>
-					<ChatRequest last />
-				</div>
-			) : (
-				<div className="max-w-190 w-full px-4">
-					<ChatRequest last />
-				</div>
-			)}
+				)}
+				<ChatRequest
+					messages={messages}
+					last
+					isStreaming={isStreaming}
+					streamContent={streamContent}
+				/>
+			</div>
 		</div>
 	);
 }

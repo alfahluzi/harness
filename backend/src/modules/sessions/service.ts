@@ -21,6 +21,7 @@ export class SessionService {
 		agentProfile: string;
 		background: boolean;
 		configDir: string;
+		model?: string;
 	}) {
 		const child = await this.langgraph_client.threads.create();
 		const sessionId = `bg_${crypto.randomUUID().slice(0, 8)}`;
@@ -36,6 +37,7 @@ export class SessionService {
 			agentProfile: opts.agentProfile,
 			background: opts.background,
 			configDir: opts.configDir,
+			model: opts.model,
 			status: "pending",
 			createdAt,
 		};
@@ -48,7 +50,8 @@ export class SessionService {
 			const runtime = await resolveAgentRuntimeConfig(
 				opts.configDir,
 				opts.agentProfile,
-				opts.workspaceId,
+				undefined,
+				{ model: opts.model },
 			);
 			const run = await this.langgraph_client.runs.wait(
 				child.thread_id,
@@ -102,7 +105,8 @@ export class SessionService {
 			const runtime = await resolveAgentRuntimeConfig(
 				record.configDir,
 				record.agentProfile,
-				record.workspaceId,
+				undefined,
+				{ model: record.model },
 			);
 			const run = await this.langgraph_client.runs.create(
 				record.childThreadId,
@@ -216,12 +220,19 @@ export class SessionService {
 		return { status: r.status, result: r.result };
 	}
 
-	async sendMessage(id: string, message: string, configDir: string) {
+	async sendMessage(
+		id: string,
+		message: string,
+		configDir: string,
+		opts?: { agentProfile?: string; model?: string },
+	) {
 		const r = this.repo.getOrThrow(id);
+		const agentProfile = opts?.agentProfile?.trim() || r.agentProfile;
 		const runtime = await resolveAgentRuntimeConfig(
 			configDir,
-			r.agentProfile,
-			r.workspaceId,
+			agentProfile,
+			undefined,
+			{ model: opts?.model },
 		);
 		const run = await this.langgraph_client.runs.wait(
 			r.childThreadId,
@@ -233,6 +244,109 @@ export class SessionService {
 		);
 		this.repo.setResult(id, run, Date.now());
 		return run;
+	}
+
+	/**
+	 * Start a streaming run on an existing session thread. Preflight (session
+	 * lookup + runtime resolve + run create) happens eagerly so callers can
+	 * surface validation/config errors as a normal JSON error BEFORE any SSE
+	 * bytes are written. The returned generator yields raw stream parts as
+	 * `{ type, data }`.
+	 */
+	async streamMessage(
+		id: string,
+		message: string,
+		configDir: string,
+		signal?: AbortSignal,
+		opts?: { agentProfile?: string; model?: string },
+	): Promise<AsyncGenerator<{ type: string; data: unknown }>> {
+		const r = this.repo.getOrThrow(id);
+		const agentProfile = opts?.agentProfile?.trim() || r.agentProfile;
+		const runtime = await resolveAgentRuntimeConfig(
+			configDir,
+			agentProfile,
+			undefined,
+			{ model: opts?.model },
+		);
+		const run = await this.langgraph_client.runs.create(
+			r.childThreadId,
+			config.graphId,
+			{
+				input: { messages: [{ role: "human", content: message }] },
+				config: runtime,
+			},
+		);
+		this.repo.setRunId(r.id, run.run_id);
+		return this.streamRun(r.childThreadId, run.run_id, r, signal);
+	}
+
+	private async *streamRun(
+		childThreadId: string,
+		runId: string,
+		record: SessionRecord,
+		signal?: AbortSignal,
+	): AsyncGenerator<{ type: string; data: unknown }> {
+		const onAbort = () => {
+			void this.langgraph_client.runs
+				.cancel(childThreadId, runId)
+				.catch(() => {});
+		};
+		signal?.addEventListener("abort", onAbort, { once: true });
+		try {
+			for await (const part of this.langgraph_client.runs.joinStream(
+				childThreadId,
+				runId,
+			)) {
+				// Relay the raw stream part; error events are forwarded to the
+				// frontend instead of being thrown (so the SSE stream stays clean).
+				yield { type: part.event, data: part.data };
+				if (part.event === "error") break;
+			}
+		} finally {
+			signal?.removeEventListener("abort", onAbort);
+		}
+		// Stream ended normally — persist the resulting state.
+		const state = await this.langgraph_client.threads.getState(childThreadId);
+		this.repo.setResult(record.id, state.values, Date.now());
+	}
+
+	private stringifyContent(content: unknown): string {
+		if (typeof content === "string") return content;
+		if (content == null) return "";
+		if (Array.isArray(content)) {
+			return content
+				.map((p) => {
+					if (
+						p &&
+						typeof p === "object" &&
+						(p as { type?: unknown }).type === "text" &&
+						typeof (p as { text?: unknown }).text === "string"
+					) {
+						return (p as { text: string }).text;
+					}
+					return JSON.stringify(p);
+				})
+				.join("");
+		}
+		return JSON.stringify(content);
+	}
+
+	async getMessages(
+		id: string,
+	): Promise<{ messages: Array<{ role: string; content: string }> }> {
+		const r = this.repo.getOrThrow(id);
+		const state = await this.langgraph_client.threads.getState(r.childThreadId);
+		const messages = (state.values as { messages?: unknown } | null)?.messages;
+		if (!Array.isArray(messages)) return { messages: [] };
+		return {
+			messages: messages.map((m) => {
+				const msg = m as { role?: unknown; content?: unknown } | null;
+				return {
+					role: typeof msg?.role === "string" ? msg.role : "unknown",
+					content: this.stringifyContent(msg?.content),
+				};
+			}),
+		};
 	}
 
 	async delete(id: string) {

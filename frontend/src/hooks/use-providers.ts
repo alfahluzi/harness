@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-	deleteApiProvidersId,
+	deleteApiProvidersById,
 	getApiProviders,
-	getApiProvidersId,
-	getApiProvidersIdModels,
+	getApiProvidersById,
+	getApiProvidersByIdModels,
 	postApiProvidersConnect,
 	postApiProvidersTest,
-	putApiProvidersId,
+	putApiProvidersById,
 } from "@/lib/api";
 import type { ProviderType } from "@/lib/ui-types";
 import { useActiveWorkdir } from "./use-active-workdir";
@@ -30,7 +30,7 @@ export function useProvider(id: string | null) {
 		queryKey: ["provider", configDir, id],
 		queryFn: () => {
 			if (!id) throw new Error("id required");
-			return getApiProvidersId({ path: { id }, query: { configDir }, throwOnError: true }).then(
+			return getApiProvidersById({ path: { id }, query: { configDir }, throwOnError: true }).then(
 				(r) => r.data,
 			);
 		},
@@ -45,7 +45,7 @@ export function useProviderModels(id: string | null) {
 		queryKey: ["provider-models", configDir, id],
 		queryFn: () => {
 			if (!id) throw new Error("id required");
-			return getApiProvidersIdModels({
+			return getApiProvidersByIdModels({
 				path: { id },
 				query: { configDir },
 				throwOnError: true,
@@ -99,7 +99,7 @@ export function useUpdateProvider() {
 			id: string;
 			body: { name?: string; apiKey?: string; baseUrl?: string };
 		}) =>
-			putApiProvidersId({ path: { id }, query: { configDir }, body, throwOnError: true }).then(
+			putApiProvidersById({ path: { id }, query: { configDir }, body, throwOnError: true }).then(
 				(r) => r.data,
 			),
 		onSuccess: (_data, variables) => {
@@ -115,7 +115,7 @@ export function useDisconnectProvider() {
 	const qc = useQueryClient();
 	return useMutation({
 		mutationFn: (id: string) =>
-			deleteApiProvidersId({ path: { id }, query: { configDir }, throwOnError: true }).then(
+			deleteApiProvidersById({ path: { id }, query: { configDir }, throwOnError: true }).then(
 				(r) => r.data,
 			),
 		onSuccess: (_data, id) => {
