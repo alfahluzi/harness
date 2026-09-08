@@ -1,27 +1,18 @@
-import type { ChatMessage } from "@/lib/chat-types";
+import { Markdown } from "@/components/markdown";
 
 type MessageAiProps = {
-	msg: ChatMessage;
+	content: string;
+	streaming?: boolean;
 };
 
-export function MessageAi({ msg }: MessageAiProps) {
+export function MessageAi({ content, streaming }: MessageAiProps) {
 	return (
 		<div className="flex w-full justify-start">
-			<div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-neutral-200 bg-neutral-100 px-4 py-2.5 text-sm text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
-				<p className="whitespace-pre-wrap wrap-break-word">{msg.content}</p>
-			</div>
-		</div>
-	);
-}
-
-export function MessageAiStreaming({ content }: { content: string }) {
-	return (
-		<div className="flex w-full justify-start">
-			<div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-neutral-200 bg-neutral-100 px-4 py-2.5 text-sm text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
-				<p className="whitespace-pre-wrap wrap-break-word">
-					{content}
+			<div className="max-w-[85%] py-2.5 text-sm text-neutral-900 dark:text-neutral-100">
+				<Markdown content={content} />
+				{streaming && (
 					<span className="ml-1 inline-block h-4 w-2 animate-pulse bg-current align-middle" />
-				</p>
+				)}
 			</div>
 		</div>
 	);

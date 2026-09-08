@@ -1,14 +1,31 @@
 export type MessageRole = "human" | "ai" | "tool";
 
+export type TokenUsage = {
+	input_tokens?: number;
+	output_tokens?: number;
+	total_tokens?: number;
+	cache_read_input_tokens?: number;
+	cache_creation_input_tokens?: number;
+};
+
+export type MessageMeta = {
+	model?: string;
+	ts?: string;
+	usage?: TokenUsage;
+};
+
 export type ChatMessage = {
 	role: MessageRole;
 	content: string;
-};
+} & MessageMeta;
 
 export type SseMessageChunk = {
 	role?: MessageRole;
 	content?: string;
 	tool_calls?: unknown;
+	model?: string;
+	ts?: string;
+	usage?: TokenUsage;
 	[key: string]: unknown;
 };
 

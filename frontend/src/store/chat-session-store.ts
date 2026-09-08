@@ -5,6 +5,7 @@ import type {
 	MessageRole,
 	SseMessageChunk,
 	StreamEvent,
+	TokenUsage,
 } from "@/lib/chat-types";
 
 export type SessionStatus = "idle" | "streaming" | "error" | "cancelled";
@@ -35,6 +36,28 @@ type StoreState = {
 
 function emptySession(): SessionState {
 	return { messages: [], lastSeqByRun: new Map(), status: "idle" };
+}
+
+/**
+ * Merge two TokenUsage snapshots by adding each numeric field. Providers may
+ * emit usage on the final chunk only (single value) or per-chunk (deltas);
+ * summing works for both because missing fields are treated as 0.
+ */
+function addUsage(a: TokenUsage | undefined, b: TokenUsage | undefined): TokenUsage | undefined {
+	if (!a) return b;
+	if (!b) return a;
+	const sum = (x?: number, y?: number): number | undefined =>
+		x === undefined && y === undefined ? undefined : (x ?? 0) + (y ?? 0);
+	return {
+		input_tokens: sum(a.input_tokens, b.input_tokens),
+		output_tokens: sum(a.output_tokens, b.output_tokens),
+		total_tokens: sum(a.total_tokens, b.total_tokens),
+		cache_read_input_tokens: sum(a.cache_read_input_tokens, b.cache_read_input_tokens),
+		cache_creation_input_tokens: sum(
+			a.cache_creation_input_tokens,
+			b.cache_creation_input_tokens,
+		),
+	};
 }
 
 function lens(
@@ -129,20 +152,32 @@ export const useChatSessionStore = create<StoreState>()((set, get) => ({
 								: undefined;
 						const content =
 							typeof chunk.content === "string" ? chunk.content : "";
+						const chunkModel = typeof chunk.model === "string" ? chunk.model : undefined;
+						const chunkTs = typeof chunk.ts === "string" ? chunk.ts : undefined;
+						const chunkUsage = chunk.usage;
 						if (role === "ai") {
-							if (!content) continue;
+							if (!content && !chunkUsage && !chunkModel) continue;
 							const last = messages[messages.length - 1];
 							if (last && last.role === "ai" && sameRun) {
 								messages[messages.length - 1] = {
 									role: "ai",
 									content: last.content + content,
+									model: last.model ?? chunkModel,
+									ts: last.ts ?? chunkTs,
+									usage: addUsage(last.usage, chunkUsage),
 								};
 							} else {
-								messages.push({ role: "ai", content });
+								messages.push({
+									role: "ai",
+									content,
+									model: chunkModel,
+									ts: chunkTs,
+									usage: chunkUsage,
+								});
 							}
 						} else if (role === "human" || role === "tool") {
 							if (!content) continue;
-							messages.push({ role, content });
+							messages.push({ role, content, ts: chunkTs });
 						}
 					}
 					next.messages = messages;
@@ -204,7 +239,13 @@ export const useChatSessionStore = create<StoreState>()((set, get) => ({
 				histTail?.role === "ai" && live[0]?.role === "ai"
 					? [
 							...hist.slice(0, -1),
-							{ role: "ai", content: histTail.content + live[0].content },
+							{
+								role: "ai",
+								content: histTail.content + live[0].content,
+								model: histTail.model ?? live[0].model,
+								ts: histTail.ts ?? live[0].ts,
+								usage: addUsage(histTail.usage, live[0].usage),
+							},
 							...live.slice(1),
 						]
 					: [...hist, ...live];
@@ -233,7 +274,7 @@ export const useChatSessionStore = create<StoreState>()((set, get) => ({
 			const messages = [...prev.messages];
 			const last = messages[messages.length - 1];
 			if (last?.role === "human" && last.content === content) return s;
-			messages.push({ role: "human", content });
+			messages.push({ role: "human", content, ts: new Date().toISOString() });
 			return lens(s.sessions, sessionId, { ...prev, messages, lastHumanContent: content });
 		}),
 

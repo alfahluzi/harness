@@ -29,7 +29,11 @@ async function consumeRunToBus(
 				}
 				return;
 			}
-			streamBus.publish(record.id, runId, part.event, part.data);
+			const enriched =
+				part.event === "messages" || part.event === "messages/partial"
+					? svc.enrichMessagesPayload(part.data)
+					: part.data;
+			streamBus.publish(record.id, runId, part.event, enriched);
 		}
 		// Normal completion — persist FIRST, then publish done (audit fix #4).
 		// Fetch state and persist inside a try so a getState failure classifies
@@ -503,32 +507,209 @@ export class SessionService {
 		return JSON.stringify(content);
 	}
 
+	/**
+	 * Extract model + timestamp + token usage from a LangChain-shaped message.
+	 * `response_metadata` and `usage_metadata` are populated automatically by
+	 * LangChain chat model wrappers for AI messages. Human messages usually
+	 * carry none of these; timestamp for them is filled from the checkpoint
+	 * step that wrote the message (see getMessages).
+	 */
+	private extractMessageMeta(m: unknown): {
+		model?: string;
+		ts?: string;
+		usage?: {
+			input_tokens?: number;
+			output_tokens?: number;
+			total_tokens?: number;
+			cache_read_input_tokens?: number;
+			cache_creation_input_tokens?: number;
+		};
+	} {
+		if (!m || typeof m !== "object") return {};
+		const msg = m as {
+			response_metadata?: unknown;
+			usage_metadata?: unknown;
+			additional_kwargs?: unknown;
+		};
+		const meta: {
+			model?: string;
+			ts?: string;
+			usage?: {
+				input_tokens?: number;
+				output_tokens?: number;
+				total_tokens?: number;
+				cache_read_input_tokens?: number;
+				cache_creation_input_tokens?: number;
+			};
+		} = {};
+
+		const respMeta =
+			msg.response_metadata && typeof msg.response_metadata === "object"
+				? (msg.response_metadata as Record<string, unknown>)
+				: undefined;
+		if (respMeta) {
+			const modelName =
+				typeof respMeta.model_name === "string"
+					? respMeta.model_name
+					: typeof respMeta.model === "string"
+						? respMeta.model
+						: undefined;
+			if (modelName) meta.model = modelName;
+			// Providers occasionally include a created_at / created timestamp.
+			const createdAt =
+				typeof respMeta.created_at === "string"
+					? respMeta.created_at
+					: typeof respMeta.created === "number"
+						? new Date(respMeta.created * 1000).toISOString()
+						: undefined;
+			if (createdAt) meta.ts = createdAt;
+		}
+
+		const usageMeta =
+			msg.usage_metadata && typeof msg.usage_metadata === "object"
+				? (msg.usage_metadata as Record<string, unknown>)
+				: undefined;
+		if (usageMeta) {
+			const pick = (k: string): number | undefined => {
+				const v = usageMeta[k];
+				return typeof v === "number" ? v : undefined;
+			};
+			const inputDetails =
+				usageMeta.input_token_details &&
+				typeof usageMeta.input_token_details === "object"
+					? (usageMeta.input_token_details as Record<string, unknown>)
+					: undefined;
+			const pickDetail = (k: string): number | undefined => {
+				if (!inputDetails) return undefined;
+				const v = inputDetails[k];
+				return typeof v === "number" ? v : undefined;
+			};
+			meta.usage = {
+				input_tokens: pick("input_tokens"),
+				output_tokens: pick("output_tokens"),
+				total_tokens: pick("total_tokens"),
+				cache_read_input_tokens: pickDetail("cache_read"),
+				cache_creation_input_tokens: pickDetail("cache_creation"),
+			};
+		}
+
+		// Fall back to additional_kwargs.created_at when node code tagged it.
+		if (!meta.ts) {
+			const kwargs =
+				msg.additional_kwargs && typeof msg.additional_kwargs === "object"
+					? (msg.additional_kwargs as Record<string, unknown>)
+					: undefined;
+			if (kwargs && typeof kwargs.created_at === "string") {
+				meta.ts = kwargs.created_at;
+			}
+		}
+		return meta;
+	}
+
+	/**
+	 * Merge meta (model / ts / usage) into each message chunk emitted over the
+	 * live SSE stream so the store can render them the same way as history
+	 * backfill. Handles both `messages` (array) and `messages-tuple`
+	 * ([message, metadata]) stream-mode shapes.
+	 */
+	enrichMessagesPayload(data: unknown): unknown {
+		const mergeOne = (m: unknown): unknown => {
+			if (!m || typeof m !== "object") return m;
+			const meta = this.extractMessageMeta(m);
+			return Object.keys(meta).length === 0 ? m : { ...m, ...meta };
+		};
+		if (Array.isArray(data)) {
+			// messages-tuple: [message, metadata]
+			if (
+				data.length === 2 &&
+				data[0] &&
+				typeof data[0] === "object" &&
+				!Array.isArray(data[0])
+			) {
+				return [mergeOne(data[0]), data[1]];
+			}
+			return data.map(mergeOne);
+		}
+		return mergeOne(data);
+	}
+
 	async getMessages(
 		id: string,
-	): Promise<{ messages: Array<{ role: string; content: string }> }> {
+	): Promise<{
+		messages: Array<{
+			role: string;
+			content: string;
+			model?: string;
+			ts?: string;
+			usage?: {
+				input_tokens?: number;
+				output_tokens?: number;
+				total_tokens?: number;
+				cache_read_input_tokens?: number;
+				cache_creation_input_tokens?: number;
+			};
+		}>;
+	}> {
 		const r = this.repo.getOrThrow(id);
 		const state = await this.langgraph_client.threads.getState(r.childThreadId);
 		const messages = (state.values as { messages?: unknown } | null)?.messages;
 		if (!Array.isArray(messages)) return { messages: [] };
+
+		// Build a msgId → checkpoint.ts map by walking history newest→oldest and
+		// remembering the earliest checkpoint that contains each message id.
+		// Used as a timestamp fallback when the message object itself carries
+		// none (typically human messages).
+		const tsByMessageId = new Map<string, string>();
+		try {
+			const history = await this.langgraph_client.threads.getHistory(
+				r.childThreadId,
+				{ limit: 100 },
+			);
+			// history is newest-first; iterate reverse so earlier checkpoints
+			// (i.e. when a message first appeared) win.
+			for (let i = history.length - 1; i >= 0; i--) {
+				const snap = history[i] as {
+					created_at?: string;
+					values?: { messages?: unknown };
+				};
+				const list = snap?.values?.messages;
+				if (!Array.isArray(list)) continue;
+				const ts = typeof snap.created_at === "string" ? snap.created_at : undefined;
+				if (!ts) continue;
+				for (const raw of list) {
+					const id = (raw as { id?: unknown } | null)?.id;
+					if (typeof id === "string" && !tsByMessageId.has(id)) {
+						tsByMessageId.set(id, ts);
+					}
+				}
+			}
+		} catch {
+			// getHistory best-effort — omit timestamps if unavailable.
+		}
+
 		return {
 			messages: messages.map((m) => {
 				const msg = m as {
 					type?: unknown;
 					role?: unknown;
 					content?: unknown;
+					id?: unknown;
 				} | null;
-				// LangGraph canonical field is `type` ("human" | "ai" | "tool" |
-				// "system"); some app-shaped messages use `role`. Prefer `type`,
-				// fall back to `role`, then to "unknown".
 				const raw =
 					typeof msg?.type === "string"
 						? msg.type
 						: typeof msg?.role === "string"
 							? msg.role
 							: "unknown";
+				const meta = this.extractMessageMeta(m);
+				if (!meta.ts && typeof msg?.id === "string") {
+					const tsFromCheckpoint = tsByMessageId.get(msg.id);
+					if (tsFromCheckpoint) meta.ts = tsFromCheckpoint;
+				}
 				return {
 					role: raw,
 					content: this.stringifyContent(msg?.content),
+					...meta,
 				};
 			}),
 		};
