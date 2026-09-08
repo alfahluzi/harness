@@ -9,7 +9,9 @@ import {
 	API_BASE_URL,
 	cancelRun,
 	fetchMessages,
+	restartFromCheckpoint,
 	startRun,
+	switchBranch as apiSwitchBranch,
 } from "@/lib/stream";
 import { useAgentModelSelection } from "./-hooks/use-agent-model";
 import type { ChatMessage } from "@/lib/chat-types";
@@ -52,6 +54,9 @@ function RouteComponent() {
 	const [error, setError] = useState<string | null>(null);
 	const [info, setInfo] = useState<string | null>(null);
 	const [historyLoaded, setHistoryLoaded] = useState(false);
+	const [restartCheckpointId, setRestartCheckpointId] = useState<string | null>(
+		null,
+	);
 
 	// Feed the app-lifetime firehose while this session is being viewed.
 	useSessionSubscription(sessionId);
@@ -114,13 +119,40 @@ function RouteComponent() {
 		setInfo(null);
 	};
 
+	const restartFrom = useCallback((checkpointId: string, content: string) => {
+		setRestartCheckpointId(checkpointId);
+		setText(content);
+		setError(null);
+		setInfo(null);
+		requestAnimationFrame(() => {
+			textareaRef.current?.focus();
+		});
+	}, []);
+
+	const switchBranch = useCallback(
+		(checkpointId: string) => {
+			if (!sessionId) return;
+			apiSwitchBranch(API_BASE_URL, sessionId, checkpointId)
+				.then(() => fetchMessages(API_BASE_URL, sessionId))
+				.then(({ messages: msgs }) => {
+					const store = useChatSessionStore.getState();
+					store.reset(sessionId);
+					store.applyHistory(sessionId, msgs);
+				})
+				.catch((err) => {
+					setError(err instanceof Error ? err.message : String(err));
+				});
+		},
+		[sessionId],
+	);
+
 	// Fire-and-forget run start: the POST returns { runId } immediately; all
 	// stream relays arrive via the global firehose.
 	const submitMessage = useCallback(
 		(
 			targetSessionId: string,
 			message: string,
-			streamAgent?: string,
+			streamAgent: string,
 			streamModel?: string,
 		) => {
 			const store = useChatSessionStore.getState();
@@ -135,7 +167,7 @@ function RouteComponent() {
 			void startRun(API_BASE_URL, targetSessionId, {
 				message,
 				configDir,
-				agentProfile: streamAgent || undefined,
+				agentProfile: streamAgent,
 				model: streamModel || undefined,
 			})
 				.then(({ runId }) => {
@@ -157,7 +189,7 @@ function RouteComponent() {
 
 		let cancelled = false;
 		fetchMessages(API_BASE_URL, sessionId)
-			.then((msgs) => {
+			.then(({ messages: msgs }) => {
 				if (cancelled) return;
 				useChatSessionStore.getState().applyHistory(sessionId, msgs);
 				setHistoryLoaded(true);
@@ -189,7 +221,7 @@ function RouteComponent() {
 		if (autoSubmittedRef.current.has(key)) return;
 		autoSubmittedRef.current.add(key);
 
-		submitMessage(sessionId, pendingPrompt, agentProfile || undefined, model || undefined);
+		submitMessage(sessionId, pendingPrompt, agentProfile, model || undefined);
 		void navigate({
 			to: "/u/chat",
 			search: { sessionId },
@@ -213,8 +245,41 @@ function RouteComponent() {
 		if (configDir.length === 0) return;
 		if (isStreaming) return;
 
+		if (sessionId && restartCheckpointId) {
+			const store = useChatSessionStore.getState();
+			store.setStatus(sessionId, "streaming");
+			setText("");
+			resize();
+			setError(null);
+			setInfo(null);
+			const cpId = restartCheckpointId;
+			setRestartCheckpointId(null);
+			void restartFromCheckpoint(API_BASE_URL, sessionId, {
+				checkpointId: cpId,
+				message: trimmed,
+				configDir,
+				agentProfile,
+				model: model || undefined,
+			})
+				.then(({ runId }) => {
+					useChatSessionStore.getState().setActiveRun(sessionId, runId);
+					return fetchMessages(API_BASE_URL, sessionId);
+				})
+				.then(({ messages: msgs }) => {
+					const store = useChatSessionStore.getState();
+					store.reset(sessionId);
+					store.applyHistory(sessionId, msgs);
+					store.setStatus(sessionId, "streaming");
+				})
+				.catch((err) => {
+					useChatSessionStore.getState().setStatus(sessionId, "idle");
+					setError(err instanceof Error ? err.message : String(err));
+				});
+			return;
+		}
+
 		if (sessionId) {
-			submitMessage(sessionId, trimmed, agentProfile || undefined, model || undefined);
+			submitMessage(sessionId, trimmed, agentProfile, model || undefined);
 			return;
 		}
 
@@ -226,7 +291,7 @@ function RouteComponent() {
 				configDir,
 				description: trimmed.slice(0, 80),
 				prompt: trimmed,
-				agentProfile: agentProfile || undefined,
+				agentProfile,
 				model: model || undefined,
 			},
 			{
@@ -278,6 +343,8 @@ function RouteComponent() {
 				messages={panelMessages}
 				isStreaming={isStreaming}
 				streamContent={streamContent}
+				onRestart={restartFrom}
+				onSwitchBranch={switchBranch}
 			/>
 			<Composer
 				text={text}

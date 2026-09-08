@@ -17,20 +17,26 @@ export const API_BASE_URL: string =
 
 /**
  * Load session message history.
- * Backend: GET /api/sessions/:id/messages -> { messages: [{ role, content }] }
+ * Backend: GET /api/sessions/:id/messages -> { messages, activeCheckpointId? }
  */
 export async function fetchMessages(
 	baseUrl: string,
 	sessionId: string,
-): Promise<ChatMessage[]> {
+): Promise<{ messages: ChatMessage[]; activeCheckpointId?: string }> {
 	const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/messages`);
 	if (!res.ok) {
 		throw new Error(
 			`Failed to load messages (HTTP ${res.status})`,
 		);
 	}
-	const body = (await res.json()) as { messages?: ChatMessage[] };
-	return Array.isArray(body.messages) ? body.messages : [];
+	const body = (await res.json()) as {
+		messages?: ChatMessage[];
+		activeCheckpointId?: string;
+	};
+	return {
+		messages: Array.isArray(body.messages) ? body.messages : [],
+		activeCheckpointId: body.activeCheckpointId,
+	};
 }
 
 /**
@@ -44,7 +50,7 @@ export async function startRun(
 	body: {
 		message: string;
 		configDir: string;
-		agentProfile?: string;
+		agentProfile: string;
 		model?: string;
 	},
 ): Promise<{ runId: string }> {
@@ -70,6 +76,82 @@ export async function startRun(
 		throw new Error("Backend did not return a runId");
 	}
 	return { runId: parsed.runId };
+}
+
+/**
+ * Fork or replace a past human message and start a run on the new branch.
+ * Backend: POST /api/sessions/:id/restart -> 202 { runId, checkpointId, status }
+ */
+export async function restartFromCheckpoint(
+	baseUrl: string,
+	sessionId: string,
+	body: {
+		checkpointId: string;
+		message: string;
+		configDir: string;
+		agentProfile: string;
+		model?: string;
+	},
+): Promise<{ runId: string; checkpointId: string }> {
+	const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/restart`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+
+	if (!res.ok) {
+		let message = `Failed to restart (HTTP ${res.status})`;
+		try {
+			const err = (await res.json()) as { error?: string };
+			if (err?.error) message = err.error;
+		} catch {
+			// keep default
+		}
+		throw new Error(message);
+	}
+
+	const parsed = (await res.json()) as {
+		runId?: string;
+		checkpointId?: string;
+	};
+	if (!parsed.runId || !parsed.checkpointId) {
+		throw new Error("Backend did not return runId + checkpointId");
+	}
+	return { runId: parsed.runId, checkpointId: parsed.checkpointId };
+}
+
+/**
+ * Move the session's active branch pointer to a sibling checkpoint.
+ * Backend: POST /api/sessions/:id/switch-branch -> 200 { activeCheckpointId }
+ */
+export async function switchBranch(
+	baseUrl: string,
+	sessionId: string,
+	checkpointId: string,
+): Promise<{ activeCheckpointId: string }> {
+	const res = await fetch(
+		`${baseUrl}/api/sessions/${sessionId}/switch-branch`,
+		{
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ checkpointId }),
+		},
+	);
+	if (!res.ok) {
+		let message = `Failed to switch branch (HTTP ${res.status})`;
+		try {
+			const err = (await res.json()) as { error?: string };
+			if (err?.error) message = err.error;
+		} catch {
+			// keep default
+		}
+		throw new Error(message);
+	}
+	const parsed = (await res.json()) as { activeCheckpointId?: string };
+	if (!parsed.activeCheckpointId) {
+		throw new Error("Backend did not return activeCheckpointId");
+	}
+	return { activeCheckpointId: parsed.activeCheckpointId };
 }
 
 /**

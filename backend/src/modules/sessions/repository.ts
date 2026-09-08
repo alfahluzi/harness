@@ -15,7 +15,6 @@ export interface SessionRecord {
 	parentThreadId?: string;
 	childThreadId: string;
 	runId: string;
-	agentProfile: string;
 	background: boolean;
 	configDir: string;
 	model?: string;
@@ -24,6 +23,7 @@ export interface SessionRecord {
 	completedAt?: number;
 	result?: unknown;
 	error?: string;
+	activeCheckpointId?: string;
 }
 
 interface SessionRow {
@@ -33,7 +33,6 @@ interface SessionRow {
 	parent_thread_id: string | null;
 	child_thread_id: string;
 	run_id: string | null;
-	agent_profile: string;
 	background: number;
 	config_dir: string;
 	model: string | null;
@@ -42,6 +41,7 @@ interface SessionRow {
 	completed_at: number | null;
 	result_json: string | null;
 	error: string | null;
+	active_checkpoint_id: string | null;
 }
 
 function rowToRecord(row: SessionRow): SessionRecord {
@@ -52,7 +52,6 @@ function rowToRecord(row: SessionRow): SessionRecord {
 		parentThreadId: row.parent_thread_id ?? undefined,
 		childThreadId: row.child_thread_id,
 		runId: row.run_id ?? "",
-		agentProfile: row.agent_profile,
 		background: row.background === 1,
 		configDir: row.config_dir,
 		model: row.model ?? undefined,
@@ -61,6 +60,7 @@ function rowToRecord(row: SessionRow): SessionRecord {
 		completedAt: row.completed_at ?? undefined,
 		result: row.result_json ? JSON.parse(row.result_json) : undefined,
 		error: row.error ?? undefined,
+		activeCheckpointId: row.active_checkpoint_id ?? undefined,
 	};
 }
 
@@ -74,6 +74,7 @@ interface Stmts {
 	setRunId: Statement;
 	setResult: Statement;
 	setError: Statement;
+	setActiveCheckpoint: Statement;
 	delete: Statement;
 }
 
@@ -82,8 +83,8 @@ function prepare(db: Database): Stmts {
 		insert: db.prepare(`
 			INSERT INTO sessions (
 				id, workspace_id, description, parent_thread_id, child_thread_id, run_id,
-				agent_profile, background, config_dir, model, status, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				background, config_dir, model, status, created_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`),
 		get: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
 		list: db.prepare(`
@@ -111,6 +112,9 @@ function prepare(db: Database): Stmts {
 			   SET status = 'error', error = ?, completed_at = ?
 			 WHERE id = ?
 		`),
+		setActiveCheckpoint: db.prepare(`
+			UPDATE sessions SET active_checkpoint_id = ? WHERE id = ?
+		`),
 		delete: db.prepare(`DELETE FROM sessions WHERE id = ?`),
 	};
 }
@@ -136,7 +140,6 @@ export class SessionRepository {
 			session.parentThreadId ?? null,
 			session.childThreadId,
 			session.runId,
-			session.agentProfile,
 			session.background ? 1 : 0,
 			session.configDir,
 			session.model ?? null,
@@ -186,6 +189,10 @@ export class SessionRepository {
 
 	setError(id: string, error: string, completedAt: number): void {
 		this.stmts.setError.run(error, completedAt, id);
+	}
+
+	setActiveCheckpoint(id: string, checkpointId: string | null): void {
+		this.stmts.setActiveCheckpoint.run(checkpointId, id);
 	}
 
 	delete(id: string): void {

@@ -30,7 +30,7 @@ export function Markdown({ content, className }: MarkdownProps) {
 						if (isBlock) {
 							return (
 								<code
-									className={`${codeClass ?? ""} block overflow-x-auto rounded-md bg-neutral-200 p-2 font-mono text-xs dark:bg-neutral-800`}
+									className={`${codeClass ?? ""} block overflow-x-auto rounded-md bg-neutral-200 p-0.5 font-mono text-xs dark:bg-neutral-800`}
 								>
 									{children}
 								</code>

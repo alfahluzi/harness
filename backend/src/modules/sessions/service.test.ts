@@ -185,6 +185,10 @@ class FakeSessionRepo {
 			row.completedAt = completedAt;
 		}
 	}
+	setActiveCheckpoint(id: string, checkpointId: string | null): void {
+		const row = this.rows.get(id);
+		if (row) row.activeCheckpointId = checkpointId ?? undefined;
+	}
 	delete(id: string): void {
 		this.rows.delete(id);
 	}
@@ -203,7 +207,6 @@ function makeRecord(id: string, childThreadId: string): SessionRecord {
 		parentThreadId: undefined,
 		childThreadId,
 		runId: "",
-		agentProfile: "coder",
 		background: true,
 		configDir,
 		status: "pending",
@@ -378,7 +381,7 @@ describe("SessionService.startRun", () => {
 		}) as typeof repo.setResult;
 
 		const done = waitForEvent((e) => e.sessionId === "s1" && e.type === "done");
-		const result = await svc.startRun("s1", "hello", configDir);
+		const result = await svc.startRun("s1", "hello", configDir, { agentProfile: "coder" });
 		const doneEvent = await done;
 
 		expect(result).toEqual({ runId: "run-s1", status: "running" });
@@ -406,7 +409,7 @@ describe("SessionService.startRun", () => {
 		const cancelled = waitForEvent(
 			(e) => e.sessionId === "s1" && e.type === "cancelled",
 		);
-		await svc.startRun("s1", "hello", configDir);
+		await svc.startRun("s1", "hello", configDir, { agentProfile: "coder" });
 		const ev = await cancelled;
 
 		expect(ev.runId).toBe("run-cancel");
@@ -429,11 +432,367 @@ describe("SessionService.startRun", () => {
 		const error = waitForEvent(
 			(e) => e.sessionId === "s1" && e.type === "error",
 		);
-		await svc.startRun("s1", "hello", configDir);
+		await svc.startRun("s1", "hello", configDir, { agentProfile: "coder" });
 		const ev = await error;
 
 		expect((ev.data as { error: string }).error).toContain("boom");
 		expect(repo.get("s1")?.status).toBe("error");
 		expect(repo.get("s1")?.error).toContain("boom");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Branching (restart / switchBranch / getMessages chain walk)
+// ---------------------------------------------------------------------------
+
+type HistorySnap = {
+	checkpoint: { checkpoint_id: string };
+	parent_checkpoint: { checkpoint_id: string } | null;
+	metadata?: { source?: string };
+	values?: { messages?: Array<Record<string, unknown>> };
+	created_at?: string;
+	next?: string[];
+};
+
+function makeBranchClient(opts: {
+	history: HistorySnap[];
+	runId?: string;
+	updateStateReturn?: string;
+	captureRunCreate?: (args: unknown) => void;
+	captureUpdateState?: (args: unknown) => void;
+}): Client {
+	return {
+		runs: {
+			create: async (_tid: string, _gid: string, args: unknown) => {
+				opts.captureRunCreate?.(args);
+				return { run_id: opts.runId ?? "run-branch" };
+			},
+			cancel: async () => undefined,
+			list: async () => [] as Array<{ status: string }>,
+			joinStream: async function* () {},
+		},
+		threads: {
+			getHistory: async () => opts.history,
+			getState: async () => ({
+				values: {
+					messages:
+						opts.history[0]?.values?.messages ?? [],
+				},
+				checkpoint: opts.history[0]?.checkpoint ?? {
+					checkpoint_id: "head",
+				},
+			}),
+			updateState: async (_tid: string, args: unknown) => {
+				opts.captureUpdateState?.(args);
+				return {
+					configurable: {
+						checkpoint_id: opts.updateStateReturn ?? "cp-forked",
+					},
+				};
+			},
+		},
+	} as unknown as Client;
+}
+
+describe("branching", () => {
+	function makeService(repo: FakeSessionRepo, client: Client) {
+		return new SessionServiceCtor(
+			repo as unknown as SessionRepository,
+			client,
+		);
+	}
+
+	test("getMessages walks activeCheckpointId chain and tags each human with fork anchor", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp3" },
+				parent_checkpoint: { checkpoint_id: "cp2" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [
+						{ id: "m-h1", type: "human", content: "hi" },
+						{ id: "m-a1", type: "ai", content: "hello" },
+					],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp2" },
+				parent_checkpoint: { checkpoint_id: "cp1" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [{ id: "m-h1", type: "human", content: "hi" }],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp1" },
+				parent_checkpoint: null,
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+		];
+		const repo = new FakeSessionRepo();
+		const rec = makeRecord("s-b1", "thread-b1");
+		rec.activeCheckpointId = "cp3";
+		repo.insert(rec);
+		const svc = makeService(repo, makeBranchClient({ history }));
+
+		const out = await svc.getMessages("s-b1");
+		expect(out.activeCheckpointId).toBe("cp3");
+		expect(out.messages).toHaveLength(2);
+		expect(out.messages[0]!.id).toBe("m-h1");
+		expect(out.messages[0]!.role).toBe("human");
+		expect(out.messages[0]!.checkpointId).toBe("cp2");
+		expect(out.messages[0]!.branchTotal).toBeUndefined();
+	});
+
+	test("getMessages tags branchIndex/branchTotal + siblings when parent has multiple children", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp-tailA" },
+				parent_checkpoint: { checkpoint_id: "cp-input" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [
+						{ id: "m-A", type: "human", content: "A version" },
+						{ id: "m-A-ai", type: "ai", content: "answer A" },
+					],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-tailB" },
+				parent_checkpoint: { checkpoint_id: "cp-input" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [{ id: "m-B", type: "human", content: "B version" }],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-input" },
+				parent_checkpoint: null,
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+		];
+		const repo = new FakeSessionRepo();
+		const rec = makeRecord("s-b2", "thread-b2");
+		rec.activeCheckpointId = "cp-tailA";
+		repo.insert(rec);
+		const svc = makeService(repo, makeBranchClient({ history }));
+
+		const out = await svc.getMessages("s-b2");
+		const human = out.messages.find((m) => m.role === "human")!;
+		expect(human.branchTotal).toBe(2);
+		expect(human.branchIndex).toBeGreaterThanOrEqual(1);
+		expect(human.siblingCheckpointIds).toEqual(
+			["cp-tailA", "cp-tailB"].sort(),
+		);
+	});
+
+	test("restart with AI response after target → branch: runs.create with new human input + forkParent", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp-tail" },
+				parent_checkpoint: { checkpoint_id: "cp-human" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [
+						{ id: "m-h", type: "human", content: "old q" },
+						{ id: "m-a", type: "ai", content: "old answer" },
+					],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-human" },
+				parent_checkpoint: { checkpoint_id: "cp-input" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [{ id: "m-h", type: "human", content: "old q" }],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-input" },
+				parent_checkpoint: null,
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+		];
+		let captured: { checkpointId?: string; input?: unknown } = {};
+		const repo = new FakeSessionRepo();
+		repo.insert(makeRecord("s-b3", "thread-b3"));
+		const svc = makeService(
+			repo,
+			makeBranchClient({
+				history,
+				runId: "run-fork",
+				captureRunCreate: (args) => {
+					const a = args as { checkpointId?: string; input?: unknown };
+					captured = { checkpointId: a.checkpointId, input: a.input };
+				},
+			}),
+		);
+
+		const result = await svc.restart(
+			"s-b3",
+			"cp-human",
+			"new q",
+			configDir,
+			{ agentProfile: "coder" },
+		);
+
+		expect(result.runId).toBe("run-fork");
+		expect(result.checkpointId).toBe("cp-input");
+		expect(captured.checkpointId).toBe("cp-input");
+		expect(captured.input).toEqual({
+			messages: [{ role: "human", content: "new q" }],
+		});
+	});
+
+	test("restart WITHOUT AI response after target → replace: updateState with same id + run resume from forked cp", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp-human" },
+				parent_checkpoint: { checkpoint_id: "cp-input" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [{ id: "m-h", type: "human", content: "old q" }],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-input" },
+				parent_checkpoint: null,
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+		];
+		let runCreate: { checkpointId?: string; input?: unknown } = {};
+		let updateState: { values?: unknown; checkpointId?: string } = {};
+		const repo = new FakeSessionRepo();
+		repo.insert(makeRecord("s-b4", "thread-b4"));
+		const svc = makeService(
+			repo,
+			makeBranchClient({
+				history,
+				runId: "run-replace",
+				updateStateReturn: "cp-replaced",
+				captureRunCreate: (args) => {
+					const a = args as { checkpointId?: string; input?: unknown };
+					runCreate = { checkpointId: a.checkpointId, input: a.input };
+				},
+				captureUpdateState: (args) => {
+					const a = args as { values?: unknown; checkpointId?: string };
+					updateState = { values: a.values, checkpointId: a.checkpointId };
+				},
+			}),
+		);
+
+		const result = await svc.restart(
+			"s-b4",
+			"cp-human",
+			"corrected q",
+			configDir,
+			{ agentProfile: "coder" },
+		);
+
+		expect(result.runId).toBe("run-replace");
+		expect(result.checkpointId).toBe("cp-replaced");
+		expect(updateState.checkpointId).toBe("cp-input");
+		expect(updateState.values).toEqual({
+			messages: [{ id: "m-h", role: "human", content: "corrected q" }],
+		});
+		expect(runCreate.checkpointId).toBe("cp-replaced");
+		expect(runCreate.input).toBeNull();
+	});
+
+	test("switchBranch validates target checkpoint exists then flips activeCheckpointId", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp-a" },
+				parent_checkpoint: null,
+				metadata: { source: "loop" },
+				values: { messages: [] },
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-b" },
+				parent_checkpoint: null,
+				metadata: { source: "loop" },
+				values: { messages: [] },
+			},
+		];
+		const repo = new FakeSessionRepo();
+		const rec = makeRecord("s-b5", "thread-b5");
+		rec.activeCheckpointId = "cp-a";
+		repo.insert(rec);
+		const svc = makeService(repo, makeBranchClient({ history }));
+
+		const out = await svc.switchBranch("s-b5", "cp-b");
+		expect(out.activeCheckpointId).toBe("cp-b");
+		expect(repo.get("s-b5")?.activeCheckpointId).toBe("cp-b");
+
+		await expect(svc.switchBranch("s-b5", "cp-nonexistent")).rejects.toThrow();
+	});
+
+	test("activeCheckpointId pointing at input cp is skipped to newest non-input descendant", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp-tail" },
+				parent_checkpoint: { checkpoint_id: "cp-input" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [
+						{ id: "m-h", type: "human", content: "hi" },
+						{ id: "m-a", type: "ai", content: "hello" },
+					],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-input" },
+				parent_checkpoint: null,
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+		];
+		const repo = new FakeSessionRepo();
+		const rec = makeRecord("s-b6", "thread-b6");
+		rec.activeCheckpointId = "cp-input";
+		repo.insert(rec);
+		const svc = makeService(repo, makeBranchClient({ history }));
+
+		const out = await svc.getMessages("s-b6");
+		expect(out.messages).toHaveLength(2);
+		expect(out.messages[0]?.id).toBe("m-h");
+	});
+
+	test("sibling list excludes empty input-cp siblings (loop cps only)", async () => {
+		const history: HistorySnap[] = [
+			{
+				checkpoint: { checkpoint_id: "cp-loopA" },
+				parent_checkpoint: { checkpoint_id: "cp-input" },
+				metadata: { source: "loop" },
+				values: {
+					messages: [{ id: "m-A", type: "human", content: "A" }],
+				},
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-input" },
+				parent_checkpoint: { checkpoint_id: "cp-prev" },
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+			{
+				checkpoint: { checkpoint_id: "cp-otherInput" },
+				parent_checkpoint: { checkpoint_id: "cp-prev" },
+				metadata: { source: "input" },
+				values: { messages: [] },
+			},
+		];
+		const repo = new FakeSessionRepo();
+		const rec = makeRecord("s-b7", "thread-b7");
+		rec.activeCheckpointId = "cp-loopA";
+		repo.insert(rec);
+		const svc = makeService(repo, makeBranchClient({ history }));
+
+		const out = await svc.getMessages("s-b7");
+		const h = out.messages.find((m) => m.role === "human")!;
+		expect(h.branchTotal).toBeUndefined();
 	});
 });

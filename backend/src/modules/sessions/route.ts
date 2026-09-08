@@ -4,7 +4,11 @@ import { SessionNotFoundError } from "./repository";
 import { AgentRuntimeError } from "../../global/agent-runtime";
 import { ThreadBusyError } from "../../global/errors";
 import { streamBus, ConnectionMux } from "../../global/stream-bus";
-import { StreamMessageInput } from "./schema";
+import {
+	RestartMessageInput,
+	StreamMessageInput,
+	SwitchBranchInput,
+} from "./schema";
 
 const sessionService = new SessionService();
 
@@ -16,7 +20,6 @@ const SessionSummarySchema = z
 		workspaceId: z.string(),
 		description: z.string(),
 		status: z.string(),
-		agentProfile: z.string(),
 		createdAt: z.number(),
 		completedAt: z.number().optional(),
 	})
@@ -28,7 +31,7 @@ const CreateSessionSchema = z
 		parent: z.string().optional(),
 		description: z.string().min(1),
 		prompt: z.string().min(1),
-		agentProfile: z.string().default("semar"),
+		agentProfile: z.string().min(1),
 		background: z.boolean().default(true),
 		// When true (default) a background=true session auto-launches its run.
 		// Chat callers set start=false: the thread is created now and the run
@@ -51,7 +54,7 @@ const SendMessageSchema = z
 	.object({
 		message: z.string().min(1),
 		configDir: z.string().min(1),
-		agentProfile: z.string().optional(),
+		agentProfile: z.string().min(1),
 		model: z.string().optional(),
 	})
 	.openapi("SendMessageInput");
@@ -202,6 +205,57 @@ const messagesRouteDef = createRoute({
 		},
 		404: {
 			description: "Session not found",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+	},
+	tags: ["sessions"],
+});
+
+const restartRouteDef = createRoute({
+	method: "post",
+	path: "/sessions/:id/restart",
+	request: {
+		params: SessionIdParamSchema,
+		body: {
+			content: { "application/json": { schema: RestartMessageInput } },
+		},
+	},
+	responses: {
+		202: {
+			description:
+				"Fork or replace from a past human message; run started on the new branch",
+			content: { "application/json": { schema: z.any() } },
+		},
+		400: {
+			description: "Agent/config error",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+		409: {
+			description: "Session is still running a task",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+		404: {
+			description: "Session or checkpoint not found",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+	},
+	tags: ["sessions"],
+});
+
+const switchBranchRouteDef = createRoute({
+	method: "post",
+	path: "/sessions/:id/switch-branch",
+	request: {
+		params: SessionIdParamSchema,
+		body: { content: { "application/json": { schema: SwitchBranchInput } } },
+	},
+	responses: {
+		200: {
+			description: "Active branch pointer moved",
+			content: { "application/json": { schema: z.any() } },
+		},
+		404: {
+			description: "Session or checkpoint not found",
 			content: { "application/json": { schema: NotFoundSchema } },
 		},
 	},
@@ -365,6 +419,42 @@ app.openapi(messagesRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	try {
 		return c.json(await sessionService.getMessages(id), 200);
+	} catch (e) {
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
+		throw e;
+	}
+});
+
+app.openapi(restartRouteDef, async (c) => {
+	const { id } = c.req.valid("param");
+	const { checkpointId, message, configDir, agentProfile, model } =
+		c.req.valid("json");
+	try {
+		const result = await sessionService.restart(
+			id,
+			checkpointId,
+			message,
+			configDir,
+			{ agentProfile, model },
+		);
+		return c.json(result, 202);
+	} catch (e) {
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
+		if (e instanceof ThreadBusyError)
+			return c.json({ error: e.message }, 409);
+		if (e instanceof AgentRuntimeError)
+			return c.json({ error: e.message }, 400);
+		throw e;
+	}
+});
+
+app.openapi(switchBranchRouteDef, async (c) => {
+	const { id } = c.req.valid("param");
+	const { checkpointId } = c.req.valid("json");
+	try {
+		return c.json(await sessionService.switchBranch(id, checkpointId), 200);
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);

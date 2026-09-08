@@ -70,7 +70,7 @@ export function buildMcpServer() {
 		{
 			title: "List Sessions",
 			description:
-				"List all known sub-agent tasks with their id, description, status, agentProfile, " +
+				"List all known sub-agent tasks with their id, description, status, " +
 				"and timestamps. Use to discover running/completed background tasks.",
 			inputSchema: z.object({}).shape,
 		},
@@ -117,8 +117,11 @@ export function buildMcpServer() {
 				"the same conversation thread (two-way chat with a sub-agent).",
 			inputSchema: SendMessageInput.shape,
 		},
-		async ({ id, message, configDir }) => {
-			const result = await sessionService.sendMessage(id, message, configDir);
+		async ({ id, message, configDir, agentProfile, model }) => {
+			const result = await sessionService.sendMessage(id, message, configDir, {
+				agentProfile,
+				model,
+			});
 			return { content: [{ type: "text", text: JSON.stringify(result) }] };
 		},
 	);

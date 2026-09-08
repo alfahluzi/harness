@@ -5,7 +5,7 @@ export const CreateSessionInput = z.object({
 	parent: z.string().optional(),
 	description: z.string().min(1),
 	prompt: z.string().min(1),
-	agentProfile: z.string().default("semar"),
+	agentProfile: z.string().min(1),
 	background: z.boolean().default(true),
 	configDir: z.string().min(1),
 	model: z.string().optional(),
@@ -19,13 +19,25 @@ export const SendMessageInput = z.object({
 	id: z.string(),
 	message: z.string().min(1),
 	configDir: z.string().min(1),
-	agentProfile: z.string().optional(),
+	agentProfile: z.string().min(1),
 	model: z.string().optional(),
 });
 
 export const StreamMessageInput = z.object({
 	message: z.string().min(1),
 	configDir: z.string().min(1),
-	agentProfile: z.string().optional(),
+	agentProfile: z.string().min(1),
 	model: z.string().optional(),
+});
+
+export const RestartMessageInput = z.object({
+	checkpointId: z.string().min(1),
+	message: z.string().min(1),
+	configDir: z.string().min(1),
+	agentProfile: z.string().min(1),
+	model: z.string().optional(),
+});
+
+export const SwitchBranchInput = z.object({
+	checkpointId: z.string().min(1),
 });

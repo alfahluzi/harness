@@ -8,6 +8,8 @@ type ChatRequestProps = {
 	last: boolean;
 	isStreaming: boolean;
 	streamContent?: string;
+	onRestart?: (checkpointId: string, content: string) => void;
+	onSwitchBranch?: (checkpointId: string) => void;
 };
 
 function sumUsage(messages: ChatMessage[]): TokenUsage | undefined {
@@ -66,6 +68,8 @@ export function ChatRequest({
 	last,
 	isStreaming,
 	streamContent = "",
+	onRestart,
+	onSwitchBranch,
 }: ChatRequestProps) {
 	const firstAiModel = messages.find((m) => m.role === "ai" && m.model)?.model;
 	const usage = sumUsage(messages);
@@ -80,7 +84,15 @@ export function ChatRequest({
 			<div className="group w-full h-fit">
 				{messages.map((msg, index) => {
 					if (msg.role === "human")
-						return <MessageHuman key={index} msg={msg} model={firstAiModel} />;
+						return (
+							<MessageHuman
+								key={index}
+								msg={msg}
+								model={firstAiModel}
+								onRestart={onRestart}
+								onSwitchBranch={onSwitchBranch}
+							/>
+						);
 					if (msg.role === "ai")
 						return <MessageAi key={index} content={msg.content} />;
 					return <MessageTool key={index} msg={msg} />;

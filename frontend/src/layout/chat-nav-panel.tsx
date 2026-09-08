@@ -118,20 +118,21 @@ function SessionRow({ session }: { session: SessionSummary }) {
 			<Link
 				to="/u/chat"
 				search={{ sessionId: session.id }}
-				className="flex flex-col gap-1 rounded-md border border-transparent p-2 transition-colors hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50"
+				className="relative group flex flex-col gap-0.5 rounded-md border border-transparent px-2 p-1 transition-colors hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50"
 			>
-				<div className="flex items-center gap-2">
-					<span
-						className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(session.status)}`}
-						aria-hidden="true"
-					/>
-					<span className="truncate font-medium">{title}</span>
-				</div>
-				<div className="flex items-center justify-between gap-2 pl-4 text-xs text-neutral-500 dark:text-neutral-400">
-					<span className="truncate font-mono text-[10px]">
-						{session.agentProfile || "—"}
+				<div className="flex items-center justify-between gap-2 text-sm">
+					<div className="flex min-w-0 items-center gap-2">
+						{session.status !== STATUS_DOT["completed"] && (
+							<span
+								className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(session.status)}`}
+								aria-hidden="true"
+							/>
+						)}
+						<span className="truncate font-light">{title}</span>
+					</div>
+					<span className="absolute right-0 bg-neutral-900 py-1 px-2 shrink-0 font-extralight text-xs opacity-0 group-hover:opacity-100 transition-all">
+						{formatAgo(session.createdAt)}
 					</span>
-					<span className="shrink-0">{formatAgo(session.createdAt)}</span>
 				</div>
 			</Link>
 		</li>

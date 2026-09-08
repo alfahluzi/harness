@@ -14,10 +14,19 @@ export type MessageMeta = {
 	usage?: TokenUsage;
 };
 
+export type BranchInfo = {
+	checkpointId?: string;
+	branchIndex?: number;
+	branchTotal?: number;
+	siblingCheckpointIds?: string[];
+};
+
 export type ChatMessage = {
+	id?: string;
 	role: MessageRole;
 	content: string;
-} & MessageMeta;
+} & MessageMeta &
+	BranchInfo;
 
 export type SseMessageChunk = {
 	role?: MessageRole;

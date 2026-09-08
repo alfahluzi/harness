@@ -20,6 +20,8 @@ type ChatPanelProps = {
 	messages: ChatMessage[];
 	isStreaming: boolean;
 	streamContent: string;
+	onRestart?: (checkpointId: string, content: string) => void;
+	onSwitchBranch?: (checkpointId: string) => void;
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -39,6 +41,8 @@ export function ChatPanel({
 	messages,
 	isStreaming,
 	streamContent,
+	onRestart,
+	onSwitchBranch,
 }: ChatPanelProps) {
 	const { configDir } = useActiveWorkdir();
 	const sessions = useSessions();
@@ -98,6 +102,8 @@ export function ChatPanel({
 							last={isLast}
 							isStreaming={isLast && isStreaming}
 							streamContent={isLast ? streamContent : ""}
+							onRestart={onRestart}
+							onSwitchBranch={onSwitchBranch}
 						/>
 					);
 				})}

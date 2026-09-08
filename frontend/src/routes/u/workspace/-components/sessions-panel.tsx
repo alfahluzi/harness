@@ -90,7 +90,6 @@ function SessionRow({ session }: { session: SessionSummary }) {
 			</div>
 			<div className="flex items-center justify-between gap-2 text-[10px] text-neutral-500 font-mono">
 				<span className="truncate">{session.id}</span>
-				<span className="shrink-0">{session.agentProfile}</span>
 			</div>
 			<div className="flex items-center justify-between gap-2 text-[10px] text-neutral-500">
 				<span>{formatTime(session.createdAt)}</span>

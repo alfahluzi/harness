@@ -1,9 +1,16 @@
 import { Client } from "@langchain/langgraph-sdk";
 import { config } from "../../global/config";
-import { resolveAgentRuntimeConfig } from "../../global/agent-runtime";
+import {
+	AgentRuntimeError,
+	resolveAgentRuntimeConfig,
+} from "../../global/agent-runtime";
 import { ThreadBusyError } from "../../global/errors";
 import { streamBus } from "../../global/stream-bus";
-import { SessionRepository, type SessionRecord } from "./repository";
+import {
+	SessionNotFoundError,
+	SessionRepository,
+	type SessionRecord,
+} from "./repository";
 
 /**
  * Consume a run's stream in the background and relay every part to the global
@@ -44,6 +51,13 @@ async function consumeRunToBus(
 			);
 			if (!svc.isDeleted(record.id)) {
 				svc.repository.setResult(record.id, state.values, Date.now());
+				// Pin the new head as this session's active branch tail so
+				// getMessages() reconstructs the freshly-produced timeline on
+				// next fetch.
+				const headCp = state.checkpoint?.checkpoint_id;
+				if (headCp) {
+					svc.repository.setActiveCheckpoint(record.id, headCp);
+				}
 			}
 			streamBus.publish(record.id, runId, "done", null);
 		} catch (persistErr) {
@@ -151,7 +165,6 @@ export class SessionService {
 			parentThreadId: opts.parent,
 			childThreadId: child.thread_id,
 			runId: "",
-			agentProfile: opts.agentProfile,
 			background: opts.background,
 			configDir: opts.configDir,
 			model: opts.model,
@@ -202,7 +215,7 @@ export class SessionService {
 			};
 		}
 
-		void this.launch(record, opts.prompt);
+		void this.launch(record, opts.prompt, opts.agentProfile);
 		return {
 			sessionId: sessionId,
 			thread_id: child.thread_id,
@@ -219,21 +232,20 @@ export class SessionService {
 			workspaceId: r.workspaceId,
 			description: r.description,
 			status: r.status,
-			agentProfile: r.agentProfile,
 			createdAt: r.createdAt,
 			completedAt: r.completedAt,
 		}));
 	}
 
-	private async launch(record: SessionRecord, prompt: string) {
-		await this.acquireSlot(record.agentProfile);
+	private async launch(record: SessionRecord, prompt: string, agentProfile: string) {
+		await this.acquireSlot(agentProfile);
 		record.status = "running";
 		this.repo.setStatus(record.id, "running");
 
 		try {
 			const runtime = await resolveAgentRuntimeConfig(
 				record.configDir,
-				record.agentProfile,
+				agentProfile,
 				undefined,
 				{ model: record.model },
 			);
@@ -266,7 +278,7 @@ export class SessionService {
 			record.completedAt = Date.now();
 			this.repo.setError(record.id, String(e), record.completedAt);
 		} finally {
-			this.releaseSlot(record.agentProfile);
+			this.releaseSlot(agentProfile);
 			if (record.parentThreadId) {
 				await this.notifyParent(record).catch((e) =>
 					console.error(`notifyParent failed for ${record.id}:`, e),
@@ -389,15 +401,14 @@ export class SessionService {
 		id: string,
 		message: string,
 		configDir: string,
-		opts?: { agentProfile?: string; model?: string },
+		opts: { agentProfile: string; model?: string },
 	) {
 		const r = this.repo.getOrThrow(id);
-		const agentProfile = opts?.agentProfile?.trim() || r.agentProfile;
 		const runtime = await resolveAgentRuntimeConfig(
 			configDir,
-			agentProfile,
+			opts.agentProfile,
 			undefined,
-			{ model: opts?.model },
+			{ model: opts.model },
 		);
 		return this.withThreadLock(r.childThreadId, async () => {
 			await this.assertThreadIdle(r.childThreadId);
@@ -430,15 +441,14 @@ export class SessionService {
 		id: string,
 		message: string,
 		configDir: string,
-		opts?: { agentProfile?: string; model?: string },
+		opts: { agentProfile: string; model?: string },
 	): Promise<{ runId: string; status: "running" }> {
 		const r = this.repo.getOrThrow(id);
-		const agentProfile = opts?.agentProfile?.trim() || r.agentProfile;
 		const runtime = await resolveAgentRuntimeConfig(
 			configDir,
-			agentProfile,
+			opts.agentProfile,
 			undefined,
-			{ model: opts?.model },
+			{ model: opts.model },
 		);
 		let runId!: string;
 		await this.withThreadLock(r.childThreadId, async () => {
@@ -637,6 +647,7 @@ export class SessionService {
 		id: string,
 	): Promise<{
 		messages: Array<{
+			id?: string;
 			role: string;
 			content: string;
 			model?: string;
@@ -648,71 +659,409 @@ export class SessionService {
 				cache_read_input_tokens?: number;
 				cache_creation_input_tokens?: number;
 			};
+			checkpointId?: string;
+			branchIndex?: number;
+			branchTotal?: number;
+			siblingCheckpointIds?: string[];
 		}>;
+		activeCheckpointId?: string;
 	}> {
 		const r = this.repo.getOrThrow(id);
-		const state = await this.langgraph_client.threads.getState(r.childThreadId);
-		const messages = (state.values as { messages?: unknown } | null)?.messages;
-		if (!Array.isArray(messages)) return { messages: [] };
 
-		// Build a msgId → checkpoint.ts map by walking history newest→oldest and
-		// remembering the earliest checkpoint that contains each message id.
-		// Used as a timestamp fallback when the message object itself carries
-		// none (typically human messages).
-		const tsByMessageId = new Map<string, string>();
+		let history: Array<{
+			checkpoint: { checkpoint_id?: string };
+			parent_checkpoint: { checkpoint_id?: string } | null;
+			created_at?: string;
+			metadata?: { source?: string };
+			values?: { messages?: unknown };
+			next?: string[];
+		}> = [];
 		try {
-			const history = await this.langgraph_client.threads.getHistory(
+			history = (await this.langgraph_client.threads.getHistory(
 				r.childThreadId,
-				{ limit: 100 },
+				{ limit: 500 },
+			)) as typeof history;
+		} catch {
+			// getHistory best-effort; fall through to flat head snapshot.
+		}
+
+		const historyById = new Map<string, (typeof history)[number]>();
+		for (const snap of history) {
+			const cpId = snap.checkpoint?.checkpoint_id;
+			if (cpId) historyById.set(cpId, snap);
+		}
+
+		let activeTail =
+			r.activeCheckpointId ??
+			(history[0]?.checkpoint?.checkpoint_id ?? undefined);
+
+		// Input cps carry no messages. Walk forward from the persisted
+		// pointer until we reach the newest descendant on this branch — the
+		// cp whose children are all source:"input" again (or none).
+		{
+			const seen = new Set<string>();
+			while (activeTail && !seen.has(activeTail)) {
+				seen.add(activeTail);
+				const children = history
+					.filter(
+						(h) =>
+							h.parent_checkpoint?.checkpoint_id === activeTail &&
+							h.metadata?.source !== "input",
+					)
+					.sort((a, b) =>
+						(a.checkpoint?.checkpoint_id ?? "").localeCompare(
+							b.checkpoint?.checkpoint_id ?? "",
+						),
+					);
+				if (children.length === 0) break;
+				const next = children.at(-1);
+				if (!next?.checkpoint?.checkpoint_id) break;
+				activeTail = next.checkpoint.checkpoint_id;
+			}
+		}
+
+		const activeChainNewestFirst: typeof history = [];
+		{
+			let cursor: string | undefined = activeTail;
+			const guard = new Set<string>();
+			while (cursor && !guard.has(cursor)) {
+				guard.add(cursor);
+				const snap = historyById.get(cursor);
+				if (!snap) break;
+				activeChainNewestFirst.push(snap);
+				cursor = snap.parent_checkpoint?.checkpoint_id ?? undefined;
+			}
+		}
+		const activeChain = activeChainNewestFirst.slice().reverse();
+
+		if (activeChain.length === 0) {
+			const state = await this.langgraph_client.threads.getState(
+				r.childThreadId,
 			);
-			// history is newest-first; iterate reverse so earlier checkpoints
-			// (i.e. when a message first appeared) win.
-			for (let i = history.length - 1; i >= 0; i--) {
-				const snap = history[i] as {
-					created_at?: string;
-					values?: { messages?: unknown };
-				};
-				const list = snap?.values?.messages;
-				if (!Array.isArray(list)) continue;
-				const ts = typeof snap.created_at === "string" ? snap.created_at : undefined;
-				if (!ts) continue;
-				for (const raw of list) {
-					const id = (raw as { id?: unknown } | null)?.id;
-					if (typeof id === "string" && !tsByMessageId.has(id)) {
-						tsByMessageId.set(id, ts);
-					}
+			const flat = (state.values as { messages?: unknown } | null)?.messages;
+			if (!Array.isArray(flat)) {
+				return { messages: [], activeCheckpointId: activeTail };
+			}
+			return {
+				messages: flat.map((m) => {
+					const msg = m as {
+						type?: unknown;
+						role?: unknown;
+						content?: unknown;
+						id?: unknown;
+					} | null;
+					const raw =
+						typeof msg?.type === "string"
+							? msg.type
+							: typeof msg?.role === "string"
+								? msg.role
+								: "unknown";
+					return {
+						id: typeof msg?.id === "string" ? msg.id : undefined,
+						role: raw,
+						content: this.stringifyContent(msg?.content),
+						...this.extractMessageMeta(m),
+					};
+				}),
+				activeCheckpointId: activeTail,
+			};
+		}
+
+		const tail = activeChain[activeChain.length - 1]!;
+		const tailMessages = (tail.values?.messages ?? []) as Array<{
+			id?: unknown;
+			type?: unknown;
+			role?: unknown;
+			content?: unknown;
+		}>;
+
+		// Skip source:"input" cps — those are pre-input snapshots and do NOT
+		// contain the just-appended message. First non-input cp containing
+		// the message is its fork anchor; its parent is the pre-turn state.
+		const cpByMessageId = new Map<string, string>();
+		for (const snap of activeChain) {
+			if (snap.metadata?.source === "input") continue;
+			const list = snap.values?.messages;
+			if (!Array.isArray(list)) continue;
+			const cpId = snap.checkpoint?.checkpoint_id;
+			if (!cpId) continue;
+			for (const raw of list) {
+				const mid = (raw as { id?: unknown } | null)?.id;
+				if (typeof mid === "string" && !cpByMessageId.has(mid)) {
+					cpByMessageId.set(mid, cpId);
 				}
 			}
-		} catch {
-			// getHistory best-effort — omit timestamps if unavailable.
+		}
+
+		const childrenByParent = new Map<string, string[]>();
+		for (const snap of history) {
+			// Siblings for the switcher UI = loop checkpoints that share a
+			// pre-input (fork) checkpoint as parent. Input cps themselves are
+			// empty and have no messages, so they are not user-selectable
+			// branch tails.
+			if (snap.metadata?.source === "input") continue;
+			const parent = snap.parent_checkpoint?.checkpoint_id;
+			const cpId = snap.checkpoint?.checkpoint_id;
+			if (!parent || !cpId) continue;
+			const arr = childrenByParent.get(parent) ?? [];
+			arr.push(cpId);
+			childrenByParent.set(parent, arr);
+		}
+
+		const tsByMessageId = new Map<string, string>();
+		for (const snap of activeChain) {
+			const ts = snap.created_at;
+			if (!ts) continue;
+			const list = snap.values?.messages;
+			if (!Array.isArray(list)) continue;
+			for (const raw of list) {
+				const mid = (raw as { id?: unknown } | null)?.id;
+				if (typeof mid === "string" && !tsByMessageId.has(mid)) {
+					tsByMessageId.set(mid, ts);
+				}
+			}
 		}
 
 		return {
-			messages: messages.map((m) => {
+			messages: tailMessages.map((m) => {
 				const msg = m as {
+					id?: unknown;
 					type?: unknown;
 					role?: unknown;
 					content?: unknown;
-					id?: unknown;
-				} | null;
+				};
 				const raw =
-					typeof msg?.type === "string"
+					typeof msg.type === "string"
 						? msg.type
-						: typeof msg?.role === "string"
+						: typeof msg.role === "string"
 							? msg.role
 							: "unknown";
 				const meta = this.extractMessageMeta(m);
-				if (!meta.ts && typeof msg?.id === "string") {
-					const tsFromCheckpoint = tsByMessageId.get(msg.id);
+				const mid = typeof msg.id === "string" ? msg.id : undefined;
+				if (!meta.ts && mid) {
+					const tsFromCheckpoint = tsByMessageId.get(mid);
 					if (tsFromCheckpoint) meta.ts = tsFromCheckpoint;
 				}
+				const checkpointId = mid ? cpByMessageId.get(mid) : undefined;
+
+				let branchIndex: number | undefined;
+				let branchTotal: number | undefined;
+				let siblingCheckpointIds: string[] | undefined;
+				if (raw === "human" && checkpointId) {
+					const snap = historyById.get(checkpointId);
+					const parent = snap?.parent_checkpoint?.checkpoint_id;
+					if (parent) {
+						const siblings = childrenByParent.get(parent) ?? [];
+						if (siblings.length > 1) {
+							const sorted = [...siblings].sort();
+							const idx = sorted.indexOf(checkpointId);
+							branchIndex = idx >= 0 ? idx + 1 : undefined;
+							branchTotal = sorted.length;
+							siblingCheckpointIds = sorted;
+						}
+					}
+				}
+
 				return {
+					id: mid,
 					role: raw,
-					content: this.stringifyContent(msg?.content),
+					content: this.stringifyContent(msg.content),
 					...meta,
+					checkpointId,
+					branchIndex,
+					branchTotal,
+					siblingCheckpointIds,
 				};
 			}),
+			activeCheckpointId: activeTail,
 		};
+	}
+
+	/**
+	 * Fork or replace a past human message. The checkpointId argument names
+	 * the checkpoint where the human message first appeared (from
+	 * getMessages().checkpointId). Replace-in-place happens when no AI
+	 * response exists after that checkpoint; otherwise we branch.
+	 */
+	async restart(
+		id: string,
+		checkpointId: string,
+		message: string,
+		configDir: string,
+		opts: { agentProfile: string; model?: string },
+	): Promise<{ runId: string; checkpointId: string; status: "running" }> {
+		const r = this.repo.getOrThrow(id);
+
+		const history = (await this.langgraph_client.threads.getHistory(
+			r.childThreadId,
+			{ limit: 500 },
+		)) as Array<{
+			checkpoint: { checkpoint_id?: string };
+			parent_checkpoint: { checkpoint_id?: string } | null;
+			metadata?: { source?: string };
+			values?: { messages?: unknown };
+		}>;
+
+		const target = history.find(
+			(h) => h.checkpoint?.checkpoint_id === checkpointId,
+		);
+		if (!target) {
+			throw new SessionNotFoundError(
+				`checkpoint ${checkpointId} not found in thread ${r.childThreadId}`,
+			);
+		}
+		const forkParent = target.parent_checkpoint?.checkpoint_id;
+		if (!forkParent) {
+			throw new SessionNotFoundError(
+				`checkpoint ${checkpointId} has no parent to fork from`,
+			);
+		}
+
+		const targetMsgs = (target.values?.messages ?? []) as Array<{
+			id?: unknown;
+			role?: unknown;
+			type?: unknown;
+		}>;
+		const targetMsgIds = new Set(
+			targetMsgs
+				.map((m) => (typeof m.id === "string" ? m.id : undefined))
+				.filter((x): x is string => Boolean(x)),
+		);
+		const descendantIds = new Set<string>([checkpointId]);
+		let grew = true;
+		while (grew) {
+			grew = false;
+			for (const snap of history) {
+				const cpId = snap.checkpoint?.checkpoint_id;
+				const parent = snap.parent_checkpoint?.checkpoint_id;
+				if (!cpId || descendantIds.has(cpId)) continue;
+				if (parent && descendantIds.has(parent)) {
+					descendantIds.add(cpId);
+					grew = true;
+				}
+			}
+		}
+		descendantIds.delete(checkpointId);
+		const hasAiAfter = [...descendantIds].some((cpId) => {
+			const snap = history.find((h) => h.checkpoint?.checkpoint_id === cpId);
+			const list = snap?.values?.messages;
+			if (!Array.isArray(list)) return false;
+			return list.some((m) => {
+				const mid = (m as { id?: unknown }).id;
+				if (typeof mid === "string" && targetMsgIds.has(mid)) return false;
+				const role =
+					(m as { type?: unknown }).type ?? (m as { role?: unknown }).role;
+				return role === "ai";
+			});
+		});
+
+		const targetHuman = targetMsgs
+			.slice()
+			.reverse()
+			.find((m) => {
+				const role = m.type ?? m.role;
+				return role === "human";
+			});
+		const humanId =
+			typeof targetHuman?.id === "string" ? targetHuman.id : undefined;
+
+		const runtime = await resolveAgentRuntimeConfig(
+			configDir,
+			opts.agentProfile,
+			undefined,
+			{ model: opts.model },
+		);
+
+		return this.withThreadLock(r.childThreadId, async () => {
+			await this.assertThreadIdle(r.childThreadId);
+
+			let runCheckpointId: string;
+			let runInput: unknown;
+
+			if (hasAiAfter || !humanId) {
+				runCheckpointId = forkParent;
+				runInput = { messages: [{ role: "human", content: message }] };
+			} else {
+				// Replace-in-place: messages reducer dedups by id, so writing
+				// the same id at the pre-turn checkpoint edits the human msg
+				// rather than appending a sibling turn.
+				const newConfig = (await this.langgraph_client.threads.updateState(
+					r.childThreadId,
+					{
+						values: {
+							messages: [{ id: humanId, role: "human", content: message }],
+						},
+						checkpointId: forkParent,
+					},
+				)) as { configurable?: { checkpoint_id?: string } };
+				const forked = newConfig.configurable?.checkpoint_id;
+				if (!forked) {
+					throw new AgentRuntimeError(
+						"updateState did not return a new checkpoint_id",
+					);
+				}
+				runCheckpointId = forked;
+				runInput = null;
+			}
+
+			let run;
+			try {
+				run = await this.langgraph_client.runs.create(
+					r.childThreadId,
+					config.graphId,
+					{
+						input: runInput as Parameters<
+							typeof this.langgraph_client.runs.create
+						>[2] extends { input?: infer I } ? I : never,
+						config: runtime,
+						checkpointId: runCheckpointId,
+						streamMode: ["messages-tuple", "updates"],
+					},
+				);
+			} catch (e) {
+				if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
+				throw e;
+			}
+			this.repo.setRunId(r.id, run.run_id);
+			this.repo.setStatus(r.id, "running");
+			consumeRunToBus(this, r, run.run_id).catch((e) => {
+				console.error(`consumeRunToBus unhandled for ${r.id}:`, e);
+				streamBus.publish(r.id, run.run_id, "error", { error: String(e) });
+				if (!this.isDeleted(r.id)) {
+					this.repo.setError(r.id, String(e), Date.now());
+				}
+			});
+			return {
+				runId: run.run_id,
+				checkpointId: runCheckpointId,
+				status: "running" as const,
+			};
+		});
+	}
+
+	/**
+	 * Move the session's active branch pointer. The next getMessages() call
+	 * will reconstruct the timeline that ends at the given checkpoint.
+	 */
+	async switchBranch(
+		id: string,
+		checkpointId: string,
+	): Promise<{ activeCheckpointId: string }> {
+		const r = this.repo.getOrThrow(id);
+		const history = (await this.langgraph_client.threads.getHistory(
+			r.childThreadId,
+			{ limit: 500 },
+		)) as Array<{ checkpoint: { checkpoint_id?: string } }>;
+		const exists = history.some(
+			(h) => h.checkpoint?.checkpoint_id === checkpointId,
+		);
+		if (!exists) {
+			throw new SessionNotFoundError(
+				`checkpoint ${checkpointId} not found in thread ${r.childThreadId}`,
+			);
+		}
+		this.repo.setActiveCheckpoint(r.id, checkpointId);
+		return { activeCheckpointId: checkpointId };
 	}
 
 	async delete(id: string) {

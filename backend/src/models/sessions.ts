@@ -9,7 +9,6 @@ export const sessions = sqliteTable(
 		parentThreadId: text("parent_thread_id"),
 		childThreadId: text("child_thread_id").notNull(),
 		runId: text("run_id"),
-		agentProfile: text("agent_profile").notNull(),
 		background: integer("background", { mode: "boolean" }).notNull(),
 		configDir: text("config_dir").notNull().default(""),
 		model: text("model"),
@@ -18,6 +17,7 @@ export const sessions = sqliteTable(
 		completedAt: integer("completed_at"),
 		resultJson: text("result_json"),
 		error: text("error"),
+		activeCheckpointId: text("active_checkpoint_id"),
 	},
 	(t) => ({
 		workspaceIdx: index("sessions_workspace_idx").on(t.workspaceId),

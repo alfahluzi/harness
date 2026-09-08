@@ -9,15 +9,9 @@ type CreateSessionResult = {
 	status?: string;
 };
 
-// The backend now requires configDir in the create body, but the generated
-// OpenAPI type has not been refreshed yet. We extend it and cast at the API
-// boundary so the route stays type-safe.
-type CreateSessionInputExtended = CreateSessionInput & {
-	configDir: string;
-	agentProfile?: string;
-	model?: string;
-	// Chat streams the first run via /stream; create must NOT auto-launch a
-	// background run or the stream hits a busy-thread 409.
+// Chat streams the first run via /stream; create must NOT auto-launch a
+// background run or the stream hits a busy-thread 409.
+type CreateSessionMutationInput = Omit<CreateSessionInput, "start"> & {
 	start?: boolean;
 };
 
@@ -25,7 +19,7 @@ export function useCreateSession() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (input: CreateSessionInputExtended) =>
+		mutationFn: (input: CreateSessionMutationInput) =>
 			postApiSessions({
 				body: { ...input, start: false } as CreateSessionInput,
 				throwOnError: true,
