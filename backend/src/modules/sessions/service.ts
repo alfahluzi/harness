@@ -2,16 +2,102 @@ import { Client } from "@langchain/langgraph-sdk";
 import { config } from "../../global/config";
 import { resolveAgentRuntimeConfig } from "../../global/agent-runtime";
 import { ThreadBusyError } from "../../global/errors";
+import { streamBus } from "../../global/stream-bus";
 import { SessionRepository, type SessionRecord } from "./repository";
+
+/**
+ * Consume a run's stream in the background and relay every part to the global
+ * StreamBus. Detached from any HTTP connection: the run keeps publishing even
+ * if the calling client disconnects. Always emits a terminal envelope
+ * ("done" / "cancelled" / "error") so frontends never hang on "streaming".
+ */
+async function consumeRunToBus(
+	svc: SessionService,
+	record: SessionRecord,
+	runId: string,
+): Promise<void> {
+	try {
+		for await (const part of svc.langgraphClient.runs.joinStream(
+			record.childThreadId,
+			runId,
+			{ streamMode: ["messages-tuple", "updates"] },
+		)) {
+			if (part.event === "error") {
+				streamBus.publish(record.id, runId, "error", part.data);
+				svc.repository.setError(record.id, String(part.data), Date.now());
+				return;
+			}
+			streamBus.publish(record.id, runId, part.event, part.data);
+		}
+		// Normal completion — persist FIRST, then publish done (audit fix #4)
+		const state = await svc.langgraphClient.threads.getState(
+			record.childThreadId,
+		);
+		svc.repository.setResult(record.id, state.values, Date.now());
+		streamBus.publish(record.id, runId, "done", null);
+	} catch (e) {
+		// Distinguish cancel vs error (audit fix #9)
+		const msg = String(e);
+		const isCancel = /cancel|aborted/i.test(msg);
+		if (isCancel) {
+			streamBus.publish(record.id, runId, "cancelled", null);
+			svc.repository.setStatus(record.id, "cancelled");
+		} else {
+			streamBus.publish(record.id, runId, "error", { error: msg });
+			svc.repository.setError(record.id, msg, Date.now());
+		}
+	} finally {
+		if (record.parentThreadId) {
+			svc.notifyParent(record).catch((err) =>
+				console.error(`notifyParent failed for ${record.id}:`, err),
+			);
+		}
+	}
+}
 
 export class SessionService {
 	private langgraph_client: Client;
 	private repo: SessionRepository;
 	private activeCount = new Map<string, number>();
+	// Per-childThreadId promise chain serializes check-then-act around
+	// assertThreadIdle + runs.create (TOCTOU race, audit fix #3).
+	private mutexes = new Map<string, Promise<void>>();
 
-	constructor(repo: SessionRepository = new SessionRepository()) {
-		this.langgraph_client = new Client({ apiUrl: config.langgraphUrl });
+	constructor(repo: SessionRepository = new SessionRepository(), client?: Client) {
+		this.langgraph_client = client ?? new Client({ apiUrl: config.langgraphUrl });
 		this.repo = repo;
+	}
+
+	private async withThreadLock<T>(
+		threadId: string,
+		fn: () => Promise<T>,
+	): Promise<T> {
+		const prev = this.mutexes.get(threadId) ?? Promise.resolve();
+		let release!: () => void;
+		const next = new Promise<void>((res) => {
+			release = res;
+		});
+		this.mutexes.set(
+			threadId,
+			prev.then(() => next),
+		);
+		await prev;
+		try {
+			return await fn();
+		} finally {
+			release();
+			if (this.mutexes.get(threadId) === next) this.mutexes.delete(threadId);
+		}
+	}
+
+	/** Read-only accessor for the internal LangGraph client (used by consumeRunToBus). */
+	get langgraphClient(): Client {
+		return this.langgraph_client;
+	}
+
+	/** Read-only accessor for the repository (used by the module-level consumeRunToBus). */
+	get repository(): SessionRepository {
+		return this.repo;
 	}
 
 	async create(opts: {
@@ -122,14 +208,17 @@ export class SessionService {
 				undefined,
 				{ model: record.model },
 			);
-			const run = await this.langgraph_client.runs.create(
-				record.childThreadId,
-				config.graphId,
-				{
-					input: { messages: [{ role: "human", content: prompt }] },
-					config: runtime,
-				},
-			);
+			const run = await this.withThreadLock(record.childThreadId, async () => {
+				await this.assertThreadIdle(record.childThreadId);
+				return this.langgraph_client.runs.create(
+					record.childThreadId,
+					config.graphId,
+					{
+						input: { messages: [{ role: "human", content: prompt }] },
+						config: runtime,
+					},
+				);
+			});
 			record.runId = run.run_id;
 			this.repo.setRunId(record.id, run.run_id);
 
@@ -177,7 +266,8 @@ export class SessionService {
 		}
 	}
 
-	private async notifyParent(record: SessionRecord) {
+	/** Push a reminder into the parent thread once this session settles. */
+	async notifyParent(record: SessionRecord) {
 		if (!record.parentThreadId) return;
 
 		const siblings = this.repo.listByParent(record.parentThreadId);
@@ -227,6 +317,19 @@ export class SessionService {
 		};
 	}
 
+	/**
+	 * workspaceId for the SSE workspace filter. Returns undefined for unknown
+	 * sessions instead of throwing so the bus listener never breaks a publish
+	 * for a session that was deleted mid-run.
+	 */
+	getSessionWorkspace(id: string): string | undefined {
+		try {
+			return this.repo.getOrThrow(id).workspaceId;
+		} catch {
+			return undefined;
+		}
+	}
+
 	async getResult(id: string) {
 		const r = this.repo.getOrThrow(id);
 		if (r.status !== "completed" && r.status !== "error")
@@ -248,39 +351,39 @@ export class SessionService {
 			undefined,
 			{ model: opts?.model },
 		);
-		await this.assertThreadIdle(r.childThreadId);
-		let run;
-		try {
-			run = await this.langgraph_client.runs.wait(
-				r.childThreadId,
-				config.graphId,
-				{
-					input: { messages: [{ role: "human", content: message }] },
-					config: runtime,
-				},
-			);
-		} catch (e) {
-			if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
-			throw e;
-		}
-		this.repo.setResult(id, run, Date.now());
-		return run;
+		return this.withThreadLock(r.childThreadId, async () => {
+			await this.assertThreadIdle(r.childThreadId);
+			let run;
+			try {
+				run = await this.langgraph_client.runs.wait(
+					r.childThreadId,
+					config.graphId,
+					{
+						input: { messages: [{ role: "human", content: message }] },
+						config: runtime,
+					},
+				);
+			} catch (e) {
+				if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
+				throw e;
+			}
+			this.repo.setResult(id, run, Date.now());
+			return run;
+		});
 	}
 
 	/**
-	 * Start a streaming run on an existing session thread. Preflight (session
-	 * lookup + runtime resolve + run create) happens eagerly so callers can
-	 * surface validation/config errors as a normal JSON error BEFORE any SSE
-	 * bytes are written. The returned generator yields raw stream parts as
-	 * `{ type, data }`.
+	 * Start a run on an existing session thread and return immediately. All
+	 * stream parts are relayed to the global StreamBus by a detached
+	 * consumeRunToBus task, so the run survives client disconnects and any
+	 * number of SSE connections can watch it.
 	 */
-	async streamMessage(
+	async startRun(
 		id: string,
 		message: string,
 		configDir: string,
-		signal?: AbortSignal,
 		opts?: { agentProfile?: string; model?: string },
-	): Promise<AsyncGenerator<{ type: string; data: unknown }>> {
+	): Promise<{ runId: string; status: "running" }> {
 		const r = this.repo.getOrThrow(id);
 		const agentProfile = opts?.agentProfile?.trim() || r.agentProfile;
 		const runtime = await resolveAgentRuntimeConfig(
@@ -289,55 +392,48 @@ export class SessionService {
 			undefined,
 			{ model: opts?.model },
 		);
-		await this.assertThreadIdle(r.childThreadId);
-		let run;
-		try {
-			run = await this.langgraph_client.runs.create(
-				r.childThreadId,
-				config.graphId,
-				{
-					input: { messages: [{ role: "human", content: message }] },
-					config: runtime,
-					streamMode: ["messages-tuple", "updates"], // token-by-token + progress per node
-				},
-			);
-		} catch (e) {
-			if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
-			throw e;
-		}
-		this.repo.setRunId(r.id, run.run_id);
-		return this.streamRun(r.childThreadId, run.run_id, r, signal);
+		await this.withThreadLock(r.childThreadId, async () => {
+			await this.assertThreadIdle(r.childThreadId);
+			let run;
+			try {
+				run = await this.langgraph_client.runs.create(
+					r.childThreadId,
+					config.graphId,
+					{
+						input: { messages: [{ role: "human", content: message }] },
+						config: runtime,
+						streamMode: ["messages-tuple", "updates"], // token-by-token + progress per node
+					},
+				);
+			} catch (e) {
+				if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
+				throw e;
+			}
+			this.repo.setRunId(r.id, run.run_id);
+			this.repo.setStatus(r.id, "running");
+			// DETACH: detached task with explicit .catch() (audit fix #2)
+			consumeRunToBus(this, r, run.run_id).catch((e) => {
+				console.error(`consumeRunToBus unhandled for ${r.id}:`, e);
+				// Last-ditch terminal envelope so client never hangs
+				streamBus.publish(r.id, run.run_id, "error", { error: String(e) });
+				this.repo.setError(r.id, String(e), Date.now());
+			});
+		});
+		const final = this.repo.getOrThrow(id);
+		return { runId: final.runId, status: "running" };
 	}
 
-	private async *streamRun(
-		childThreadId: string,
-		runId: string,
-		record: SessionRecord,
-		signal?: AbortSignal,
-	): AsyncGenerator<{ type: string; data: unknown }> {
-		const onAbort = () => {
-			void this.langgraph_client.runs
-				.cancel(childThreadId, runId)
-				.catch(() => {});
-		};
-		signal?.addEventListener("abort", onAbort, { once: true });
+	/** Best-effort cancel of the active run. The consumeRunToBus loop catches
+	 * the resulting throw and publishes a "cancelled" envelope (audit fix #9). */
+	async cancelRun(id: string): Promise<void> {
+		const r = this.repo.getOrThrow(id);
+		if (!r.runId) return; // no-op
 		try {
-			for await (const part of this.langgraph_client.runs.joinStream(
-				childThreadId,
-				runId,
-				{ streamMode: ["messages-tuple", "updates"] }, // harus konsisten sama yang di-create
-			)) {
-				// Relay the raw stream part; error events are forwarded to the
-				// frontend instead of being thrown (so the SSE stream stays clean).
-				yield { type: part.event, data: part.data };
-				if (part.event === "error") break;
-			}
-		} finally {
-			signal?.removeEventListener("abort", onAbort);
+			await this.langgraph_client.runs.cancel(r.childThreadId, r.runId);
+		} catch (e) {
+			// Already done or other benign — cancelRun is best-effort
+			console.warn(`cancelRun best-effort ignore: ${e}`);
 		}
-		// Stream ended normally — persist the resulting state.
-		const state = await this.langgraph_client.threads.getState(childThreadId);
-		this.repo.setResult(record.id, state.values, Date.now());
 	}
 
 	private stringifyContent(content: unknown): string {

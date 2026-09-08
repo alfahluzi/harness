@@ -3,6 +3,7 @@ import { SessionService } from "./service";
 import { SessionNotFoundError } from "./repository";
 import { AgentRuntimeError } from "../../global/agent-runtime";
 import { ThreadBusyError } from "../../global/errors";
+import { streamBus, ConnectionMux } from "../../global/stream-bus";
 import { StreamMessageInput } from "./schema";
 
 const sessionService = new SessionService();
@@ -153,9 +154,9 @@ const streamRouteDef = createRoute({
 		body: { content: { "application/json": { schema: StreamMessageInput } } },
 	},
 	responses: {
-		200: {
-			description: "SSE stream of run events",
-			content: { "text/event-stream": { schema: z.any() } },
+		202: {
+			description: "Run started; events are relayed over GET /sessions/stream",
+			content: { "application/json": { schema: z.any() } },
 		},
 		400: {
 			description: "Agent/config error",
@@ -164,6 +165,23 @@ const streamRouteDef = createRoute({
 		409: {
 			description: "Session is still running a task",
 			content: { "application/json": { schema: NotFoundSchema } },
+		},
+		404: {
+			description: "Session not found",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+	},
+	tags: ["sessions"],
+});
+
+const cancelRouteDef = createRoute({
+	method: "post",
+	path: "/sessions/:id/cancel",
+	request: { params: SessopmIdParamSchema },
+	responses: {
+		200: {
+			description: "Cancel requested",
+			content: { "application/json": { schema: z.any() } },
 		},
 		404: {
 			description: "Session not found",
@@ -205,6 +223,34 @@ const deleteRouteDef = createRoute({
 		},
 	},
 	tags: ["sessions"],
+});
+
+// SSE firehose — relay for the global StreamBus. Kept as a plain Hono route
+// (not openapi) since SSE is not represented cleanly in the OpenAPI doc.
+// Registered BEFORE the /sessions/:id param routes: this router resolves
+// static/param conflicts by registration order, and /sessions/stream must
+// not be swallowed by /sessions/:id.
+app.get("/sessions/stream", (c) => {
+	const workspaceId = c.req.query("workspaceId");
+	const encoder = new TextEncoder();
+	const stream = new ReadableStream<Uint8Array>({
+		start(controller) {
+			const mux = new ConnectionMux(workspaceId);
+			mux.attach(controller, encoder);
+			c.req.raw.signal.addEventListener("abort", () => mux.detach());
+		},
+		cancel() {
+			// mux already detached via abort listener
+		},
+	});
+	return new Response(stream, {
+		headers: {
+			"content-type": "text/event-stream",
+			"cache-control": "no-cache",
+			connection: "keep-alive",
+			"x-accel-buffering": "no",
+		},
+	});
 });
 
 app.openapi(createRouteDef, async (c) => {
@@ -264,16 +310,12 @@ app.openapi(messageRouteDef, async (c) => {
 app.openapi(streamRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	const { message, configDir, agentProfile, model } = c.req.valid("json");
-
-	let gen: Awaited<ReturnType<SessionService["streamMessage"]>>;
 	try {
-		gen = await sessionService.streamMessage(
-			id,
-			message,
-			configDir,
-			c.req.raw.signal,
-			{ agentProfile, model },
-		);
+		const result = await sessionService.startRun(id, message, configDir, {
+			agentProfile,
+			model,
+		});
+		return c.json(result, 202);
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);
@@ -283,39 +325,18 @@ app.openapi(streamRouteDef, async (c) => {
 			return c.json({ error: e.message }, 400);
 		throw e;
 	}
+});
 
-	const encoder = new TextEncoder();
-	const stream = new ReadableStream<Uint8Array>({
-		async start(controller) {
-			try {
-				for await (const part of gen) {
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify(part)}\n\n`),
-					);
-				}
-				controller.enqueue(
-					encoder.encode(
-						`data: ${JSON.stringify({ type: "__end__" })}\n\n`,
-					),
-				);
-			} catch {
-				// connection broken / stream error — close without sending __end__
-			} finally {
-				controller.close();
-			}
-		},
-		cancel() {
-			void gen.return?.(undefined as never);
-		},
-	});
-
-	return new Response(stream, {
-		headers: {
-			"content-type": "text/event-stream",
-			"cache-control": "no-cache",
-			connection: "keep-alive",
-		},
-	});
+app.openapi(cancelRouteDef, async (c) => {
+	const { id } = c.req.valid("param");
+	try {
+		await sessionService.cancelRun(id);
+		return c.json({ status: "cancelled" }, 200);
+	} catch (e) {
+		if (e instanceof SessionNotFoundError)
+			return c.json({ error: e.message }, 404);
+		throw e;
+	}
 });
 
 app.openapi(messagesRouteDef, async (c) => {
@@ -340,5 +361,15 @@ app.openapi(deleteRouteDef, async (c) => {
 		throw e;
 	}
 });
+
+/**
+ * Wire the SSE workspace filter. The bus itself must not import modules, so
+ * the session→workspace lookup is injected from server.ts at boot.
+ */
+export function setStreamBusWorkspaceResolver(
+	resolver: (sessionId: string) => string | undefined,
+): void {
+	streamBus.setWorkspaceResolver(resolver);
+}
 
 export { app as sessionRoutes };

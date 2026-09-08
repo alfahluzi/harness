@@ -3,7 +3,10 @@ import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { buildMcpServer } from "./server.mcp";
-import { sessionRoutes } from "./modules/sessions/route";
+import {
+	sessionRoutes,
+	setStreamBusWorkspaceResolver,
+} from "./modules/sessions/route";
 import { SessionService } from "./modules/sessions/service";
 import { agentRoutes } from "./modules/agents/route";
 import { skillRoutes } from "./modules/skills/route";
@@ -12,6 +15,11 @@ import { workspaceRoutes } from "./modules/workspaces/route";
 import { providerRoutes } from "./modules/providers/route";
 
 const app = new OpenAPIHono();
+
+// Wire the SSE workspace filter once on boot (stream-bus must not import
+// modules, so the session→workspace lookup is injected here).
+const sessionService = new SessionService();
+setStreamBusWorkspaceResolver((id) => sessionService.getSessionWorkspace(id));
 
 app.use("*", logger());
 app.use("*", cors());

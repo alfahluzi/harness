@@ -15,6 +15,9 @@ export const SessionIdInput = z.object({
 	id: z.string(),
 });
 
+/** Cancel only needs the session id — same shape as SessionIdInput. */
+export const CancelSessionInput = SessionIdInput;
+
 export const SendMessageInput = z.object({
 	id: z.string(),
 	message: z.string().min(1),
