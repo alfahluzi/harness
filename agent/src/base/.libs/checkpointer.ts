@@ -4,17 +4,20 @@
 // survive process restarts. The CLI dev server picks this up via the import
 // from `./graph.ts`.
 //
-// Storage location: ../../data/shared.db (workspace root) by default —
-// shared with backend/ so both apps use the same SQLite file with their own
-// table namespaces. Override with SQLITE_CHECKPOINT_PATH. WAL mode is enabled
+// Storage location: <repo root>/data/shared.db by default — shared with
+// backend/ so both apps use the same SQLite file with their own table
+// namespaces. Override with SQLITE_CHECKPOINT_PATH. WAL mode is enabled
 // for concurrent reads while a run is in flight.
+//
+// Path is anchored to this file (agent/src/base/.libs -> repo root), not CWD,
+// so it resolves identically regardless of launch directory.
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 
 const DB_PATH = resolve(
-	process.env.SQLITE_CHECKPOINT_PATH ?? "../../data/shared.db",
+	process.env.SQLITE_CHECKPOINT_PATH ?? `${__dirname}/../../../../data/shared.db`,
 );
 
 mkdirSync(dirname(DB_PATH), { recursive: true });

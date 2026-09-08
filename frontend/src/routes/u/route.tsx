@@ -201,10 +201,10 @@ function UsersLayout() {
 				<MainPanel>
 					<Outlet />
 				</MainPanel>
-				<NavigationPanel
+				{/* <NavigationPanel
 					onResizeLeftStart={handleResizeStart}
 					width={navWidth}
-				></NavigationPanel>
+				></NavigationPanel> */}
 			</div>
 			<FooterBar />
 		</div>

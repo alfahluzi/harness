@@ -67,9 +67,9 @@ function firstConnectedProvider(
 function firstModelForProvider(
 	modelRepo: ProviderModelRepository,
 	provider: ProviderRecord,
-): string | null {
+): string {
 	const records = modelRepo.listByProvider(provider.workspaceId, provider.id);
-	return records[0]?.modelId ?? null;
+	return records[0]?.modelId ?? "";
 }
 
 export async function resolveAgentRuntimeConfig(
@@ -134,8 +134,8 @@ export async function resolveAgentRuntimeConfig(
 	const requestedModel = opts?.model?.trim() || conf.modelId?.trim();
 	const modelName =
 		requestedModel ||
-		firstModelForProvider(modelRepo, provider) ||
-		provider.defaultModel;
+		provider.defaultModel ||
+		firstModelForProvider(modelRepo, provider);
 
 	return {
 		configurable: {

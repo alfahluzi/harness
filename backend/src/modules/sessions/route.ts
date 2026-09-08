@@ -2,6 +2,7 @@ import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { SessionService } from "./service";
 import { SessionNotFoundError } from "./repository";
 import { AgentRuntimeError } from "../../global/agent-runtime";
+import { ThreadBusyError } from "../../global/errors";
 import { StreamMessageInput } from "./schema";
 
 const sessionService = new SessionService();
@@ -28,6 +29,10 @@ const CreateSessionSchema = z
 		prompt: z.string().min(1),
 		agentProfile: z.string().default("semar"),
 		background: z.boolean().default(true),
+		// When true (default) a background=true session auto-launches its run.
+		// Chat callers set start=false: the thread is created now and the run
+		// happens via the /stream endpoint instead, avoiding a double-run.
+		start: z.boolean().default(true),
 		configDir: z.string().min(1),
 		model: z.string().optional(),
 	})
@@ -128,6 +133,10 @@ const messageRouteDef = createRoute({
 			description: "Message sent",
 			content: { "application/json": { schema: z.any() } },
 		},
+		409: {
+			description: "Session is still running a task",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
 		404: {
 			description: "Session not found",
 			content: { "application/json": { schema: NotFoundSchema } },
@@ -150,6 +159,10 @@ const streamRouteDef = createRoute({
 		},
 		400: {
 			description: "Agent/config error",
+			content: { "application/json": { schema: NotFoundSchema } },
+		},
+		409: {
+			description: "Session is still running a task",
 			content: { "application/json": { schema: NotFoundSchema } },
 		},
 		404: {
@@ -242,6 +255,8 @@ app.openapi(messageRouteDef, async (c) => {
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);
+		if (e instanceof ThreadBusyError)
+			return c.json({ error: e.message }, 409);
 		throw e;
 	}
 });
@@ -262,6 +277,8 @@ app.openapi(streamRouteDef, async (c) => {
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);
+		if (e instanceof ThreadBusyError)
+			return c.json({ error: e.message }, 409);
 		if (e instanceof AgentRuntimeError)
 			return c.json({ error: e.message }, 400);
 		throw e;

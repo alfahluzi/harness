@@ -5,8 +5,12 @@ import { dirname, resolve } from "node:path";
 import * as schema from "../models";
 
 // Shared with agent/ — both apps write to the same file at workspace root.
+// Anchored to this file (backend/src/global -> repo root), not CWD, so the
+// path is identical no matter where the process is launched from.
 const DB_PATH = resolve(
-	process.env.SQLITE_PATH ?? process.env.BACKEND_DB_PATH ?? "../../data/shared.db",
+	process.env.SQLITE_PATH ??
+		process.env.BACKEND_DB_PATH ??
+		import.meta.dirname + "/../../../data/shared.db",
 );
 
 mkdirSync(dirname(DB_PATH), { recursive: true });

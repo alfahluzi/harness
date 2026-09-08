@@ -15,6 +15,5 @@ export function useSessions() {
 			}).then((r) => r.data),
 		enabled: configDir.length > 0,
 		staleTime: STALE_MS,
-		refetchInterval: STALE_MS,
 	});
 }

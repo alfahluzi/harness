@@ -1,5 +1,6 @@
 {
   "name": "Dawala",
+  "modelId": "ocg/deepseek-v4-flash",
   "role": "qa_tester",
   "temperature": 0.75,
   "called": "after Gareng",

@@ -1,5 +1,6 @@
 {
   "name": "Cepot",
+  "modelId": "ocg/deepseek-v4-flash",
   "role": "critic_risk_reviewer",
   "temperature": 0.65,
   "called": "after Dawala",

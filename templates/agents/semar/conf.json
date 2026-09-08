@@ -1,5 +1,6 @@
 {
   "name": "Semar",
+  "modelId": "ocg/deepseek-v4-flash",
   "role": "orchestrator",
   "temperature": 0.3,
   "called": "last",

@@ -1,6 +1,7 @@
 import { Client } from "@langchain/langgraph-sdk";
 import { config } from "../../global/config";
 import { resolveAgentRuntimeConfig } from "../../global/agent-runtime";
+import { ThreadBusyError } from "../../global/errors";
 import { SessionRepository, type SessionRecord } from "./repository";
 
 export class SessionService {
@@ -22,6 +23,7 @@ export class SessionService {
 		background: boolean;
 		configDir: string;
 		model?: string;
+		start?: boolean;
 	}) {
 		const child = await this.langgraph_client.threads.create();
 		const sessionId = `bg_${crypto.randomUUID().slice(0, 8)}`;
@@ -70,6 +72,18 @@ export class SessionService {
 				thread_id: child.thread_id,
 				status: record.status,
 				result: run,
+			};
+		}
+
+		// background=false: run synchronously and return the result.
+		// background=true + start=false: create the thread only; the caller
+		//   (chat) drives the run via /stream — no launch, so no double-run.
+		// background=true + start=true (default): fire the run in background.
+		if (opts.start === false) {
+			return {
+				sessionId: sessionId,
+				thread_id: child.thread_id,
+				status: record.status,
 			};
 		}
 
@@ -234,14 +248,21 @@ export class SessionService {
 			undefined,
 			{ model: opts?.model },
 		);
-		const run = await this.langgraph_client.runs.wait(
-			r.childThreadId,
-			config.graphId,
-			{
-				input: { messages: [{ role: "human", content: message }] },
-				config: runtime,
-			},
-		);
+		await this.assertThreadIdle(r.childThreadId);
+		let run;
+		try {
+			run = await this.langgraph_client.runs.wait(
+				r.childThreadId,
+				config.graphId,
+				{
+					input: { messages: [{ role: "human", content: message }] },
+					config: runtime,
+				},
+			);
+		} catch (e) {
+			if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
+			throw e;
+		}
 		this.repo.setResult(id, run, Date.now());
 		return run;
 	}
@@ -268,14 +289,22 @@ export class SessionService {
 			undefined,
 			{ model: opts?.model },
 		);
-		const run = await this.langgraph_client.runs.create(
-			r.childThreadId,
-			config.graphId,
-			{
-				input: { messages: [{ role: "human", content: message }] },
-				config: runtime,
-			},
-		);
+		await this.assertThreadIdle(r.childThreadId);
+		let run;
+		try {
+			run = await this.langgraph_client.runs.create(
+				r.childThreadId,
+				config.graphId,
+				{
+					input: { messages: [{ role: "human", content: message }] },
+					config: runtime,
+					streamMode: ["messages-tuple", "updates"], // token-by-token + progress per node
+				},
+			);
+		} catch (e) {
+			if (this.isThreadBusy(e)) throw new ThreadBusyError(r.childThreadId);
+			throw e;
+		}
 		this.repo.setRunId(r.id, run.run_id);
 		return this.streamRun(r.childThreadId, run.run_id, r, signal);
 	}
@@ -296,6 +325,7 @@ export class SessionService {
 			for await (const part of this.langgraph_client.runs.joinStream(
 				childThreadId,
 				runId,
+				{ streamMode: ["messages-tuple", "updates"] }, // harus konsisten sama yang di-create
 			)) {
 				// Relay the raw stream part; error events are forwarded to the
 				// frontend instead of being thrown (so the SSE stream stays clean).
@@ -358,6 +388,30 @@ export class SessionService {
 		}
 		await this.langgraph_client.threads.delete(r.childThreadId).catch(() => {});
 		this.repo.delete(id);
+	}
+
+	/**
+	 * LangGraph enforces one active run per thread. Reject new messages while
+	 * a run is still pending/running (HTTP 409) instead of letting the SDK
+	 * surface a raw 422 which currently bubbles up as a 500.
+	 */
+	private async assertThreadIdle(threadId: string) {
+		const runs = await this.langgraph_client.runs.list(threadId, { limit: 10 });
+		if (runs.some((r) => r.status === "pending" || r.status === "running")) {
+			throw new ThreadBusyError(threadId);
+		}
+	}
+
+	/**
+	 * The langgraph-sdk HTTPError is not exported from the package root, so
+	 * detect a busy-thread rejection by the 422 status instead of instanceof.
+	 */
+	private isThreadBusy(e: unknown): boolean {
+		return (
+			typeof e === "object" &&
+			e !== null &&
+			(e as { status?: unknown }).status === 422
+		);
 	}
 
 	private async acquireSlot(key: string) {

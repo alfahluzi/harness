@@ -16,6 +16,9 @@ type CreateSessionInputExtended = CreateSessionInput & {
 	configDir: string;
 	agentProfile?: string;
 	model?: string;
+	// Chat streams the first run via /stream; create must NOT auto-launch a
+	// background run or the stream hits a busy-thread 409.
+	start?: boolean;
 };
 
 export function useCreateSession() {
@@ -24,7 +27,7 @@ export function useCreateSession() {
 	return useMutation({
 		mutationFn: (input: CreateSessionInputExtended) =>
 			postApiSessions({
-				body: input as CreateSessionInput,
+				body: { ...input, start: false } as CreateSessionInput,
 				throwOnError: true,
 			}).then((r) => r.data as CreateSessionResult),
 		onSuccess: (_data, variables) => {

@@ -1,5 +1,6 @@
 {
   "name": "Gareng",
+  "modelId": "ocg/deepseek-v4-flash",
   "role": "implementer",
   "temperature": 0.2,
   "called": "first (after task assignment)",
