@@ -64,6 +64,11 @@ const DEFAULT_HEARTBEAT_MS = 15_000;
  * FIFO (drop-oldest on overflow, audit fix #5) and drains them to the
  * ReadableStream controller. Heartbeat keeps idle connections alive through
  * reverse proxies (audit fix #6). Detach on client abort.
+ *
+ * SECURITY: `workspaceId === undefined` means "firehose all sessions". Callers
+ * MUST derive workspaceId from an authenticated principal, not from an
+ * unvalidated query param, before this is safe in multi-tenant deployments
+ * (audit finding #8).
  */
 export class ConnectionMux {
 	private readonly bus: StreamBus;

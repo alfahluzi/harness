@@ -43,7 +43,7 @@ const WorkspaceIdQuerySchema = z
 	.object({ workspaceId: z.string().min(1) })
 	.openapi("WorkspaceIdQuery");
 
-const SessopmIdParamSchema = z
+const SessionIdParamSchema = z
 	.object({ id: z.string() })
 	.openapi("SessionIdParam");
 
@@ -91,7 +91,7 @@ const listRouteDef = createRoute({
 const statusRouteDef = createRoute({
 	method: "get",
 	path: "/sessions/:id",
-	request: { params: SessopmIdParamSchema },
+	request: { params: SessionIdParamSchema },
 	responses: {
 		200: {
 			description: "Session status",
@@ -108,7 +108,7 @@ const statusRouteDef = createRoute({
 const resultRouteDef = createRoute({
 	method: "get",
 	path: "/sessions/:id/result",
-	request: { params: SessopmIdParamSchema },
+	request: { params: SessionIdParamSchema },
 	responses: {
 		200: {
 			description: "Session result",
@@ -126,7 +126,7 @@ const messageRouteDef = createRoute({
 	method: "post",
 	path: "/sessions/:id/message",
 	request: {
-		params: SessopmIdParamSchema,
+		params: SessionIdParamSchema,
 		body: { content: { "application/json": { schema: SendMessageSchema } } },
 	},
 	responses: {
@@ -150,7 +150,7 @@ const streamRouteDef = createRoute({
 	method: "post",
 	path: "/sessions/:id/stream",
 	request: {
-		params: SessopmIdParamSchema,
+		params: SessionIdParamSchema,
 		body: { content: { "application/json": { schema: StreamMessageInput } } },
 	},
 	responses: {
@@ -177,7 +177,7 @@ const streamRouteDef = createRoute({
 const cancelRouteDef = createRoute({
 	method: "post",
 	path: "/sessions/:id/cancel",
-	request: { params: SessopmIdParamSchema },
+	request: { params: SessionIdParamSchema },
 	responses: {
 		200: {
 			description: "Cancel requested",
@@ -194,7 +194,7 @@ const cancelRouteDef = createRoute({
 const messagesRouteDef = createRoute({
 	method: "get",
 	path: "/sessions/:id/messages",
-	request: { params: SessopmIdParamSchema },
+	request: { params: SessionIdParamSchema },
 	responses: {
 		200: {
 			description: "Session message history",
@@ -211,7 +211,7 @@ const messagesRouteDef = createRoute({
 const deleteRouteDef = createRoute({
 	method: "delete",
 	path: "/sessions/:id",
-	request: { params: SessopmIdParamSchema },
+	request: { params: SessionIdParamSchema },
 	responses: {
 		200: {
 			description: "Session deleted",
@@ -230,8 +230,26 @@ const deleteRouteDef = createRoute({
 // Registered BEFORE the /sessions/:id param routes: this router resolves
 // static/param conflicts by registration order, and /sessions/stream must
 // not be swallowed by /sessions/:id.
+//
+// SECURITY POSTURE (MVP, audit finding #8):
+//   Without `?workspaceId=`, this endpoint is a TRUE FIREHOSE — every session
+//   event across every workspace is forwarded to every connected client. The
+//   backend has NO authentication (only CORS), so any network peer that can
+//   reach this route can observe all activity.
+//
+//   This matches the plan's stated MVP single-user posture. BEFORE going
+//   multi-tenant you MUST:
+//     1. Add authentication middleware in server.ts.
+//     2. Derive workspaceId server-side from the authenticated principal —
+//        do NOT trust `?workspaceId=` from the client.
+//     3. Reject connections that resolve to no workspace.
 app.get("/sessions/stream", (c) => {
-	const workspaceId = c.req.query("workspaceId");
+	// Coerce an empty `?workspaceId=` to undefined so the mux falls back to
+	// firehose semantics instead of silently dropping every event by
+	// comparing against "" (audit fix #9).
+	const rawWorkspaceId = c.req.query("workspaceId");
+	const workspaceId =
+		rawWorkspaceId && rawWorkspaceId.length > 0 ? rawWorkspaceId : undefined;
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
@@ -331,7 +349,11 @@ app.openapi(cancelRouteDef, async (c) => {
 	const { id } = c.req.valid("param");
 	try {
 		await sessionService.cancelRun(id);
-		return c.json({ status: "cancelled" }, 200);
+		// Return the actual status after the cancel attempt. The run may have
+		// completed before cancel arrived — reporting a hardcoded "cancelled"
+		// would lie to the client (audit fix #4).
+		const { status } = await sessionService.getStatus(id);
+		return c.json({ status }, 200);
 	} catch (e) {
 		if (e instanceof SessionNotFoundError)
 			return c.json({ error: e.message }, 404);

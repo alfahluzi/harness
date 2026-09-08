@@ -1,12 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPanel } from "./-components/chat-panel";
 import { Composer } from "./-components/composer";
 import { useActiveWorkdir } from "@/hooks/use-active-workdir";
 import { useCreateSession } from "@/hooks/use-create-session";
-import { fetchMessages, streamChatMessage, API_BASE_URL } from "@/lib/stream";
-import type { ChatMessage } from "@/lib/chat-types";
+import { useSessionSubscription, useChatSessionStore } from "@/store/chat-session-store";
+import {
+	API_BASE_URL,
+	cancelRun,
+	fetchMessages,
+	startRun,
+} from "@/lib/stream";
 import { useAgentModelSelection } from "./-hooks/use-agent-model";
+import type { ChatMessage } from "@/lib/chat-types";
 
 export const Route = createFileRoute("/u/chat/")({
 	validateSearch: (search: Record<string, unknown>) => {
@@ -19,6 +25,7 @@ export const Route = createFileRoute("/u/chat/")({
 });
 
 const MAX_HEIGHT = 200;
+const EMPTY_MESSAGES: ChatMessage[] = [];
 
 function RouteComponent() {
 	const { sessionId, prompt: pendingPrompt } = Route.useSearch();
@@ -26,7 +33,6 @@ function RouteComponent() {
 	const { configDir } = useActiveWorkdir();
 	const createSession = useCreateSession();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const abortControllerRef = useRef<AbortController | null>(null);
 	const autoSubmittedRef = useRef<Set<string>>(new Set());
 	const {
 		agentProfile,
@@ -35,18 +41,41 @@ function RouteComponent() {
 		setModel,
 		agents,
 		models,
+		providers,
 		modelStatus,
 		isLoadingAgents,
+		isLoadingProviders,
 		hasProvider,
 	} = useAgentModelSelection();
 
 	const [text, setText] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [info, setInfo] = useState<string | null>(null);
-	const [messages, setMessages] = useState<ChatMessage[]>([]);
-	const [isStreaming, setIsStreaming] = useState(false);
-	const [streamContent, setStreamContent] = useState("");
 	const [historyLoaded, setHistoryLoaded] = useState(false);
+
+	// Feed the app-lifetime firehose while this session is being viewed.
+	useSessionSubscription(sessionId);
+
+	// Per-session state from the global store. Selectors return stable
+	// references, so unrelated sessions' events do not re-render this route.
+	const messages = useChatSessionStore(
+		(s) => s.sessions.get(sessionId ?? "")?.messages ?? EMPTY_MESSAGES,
+	);
+	const status = useChatSessionStore(
+		(s) => s.sessions.get(sessionId ?? "")?.status ?? "idle",
+	);
+
+	const isStreaming = status === "streaming";
+
+	// While streaming, applyEvent merges the in-progress AI text into the last
+	// ai message — render it as the "live" bubble instead of as a final one.
+	const lastMessage = messages[messages.length - 1];
+	const streamContent =
+		isStreaming && lastMessage?.role === "ai" ? lastMessage.content : "";
+	const panelMessages =
+		isStreaming && lastMessage?.role === "ai"
+			? messages.slice(0, -1)
+			: messages;
 
 	const trimmed = text.trim();
 	const isPending = createSession.isPending || isStreaming;
@@ -56,6 +85,18 @@ function RouteComponent() {
 		!createSession.isPending &&
 		configDir.length > 0 &&
 		hasProvider;
+
+	const composerInfo = useMemo(() => {
+		if (info) return info;
+		if (
+			!isLoadingProviders &&
+			providers.length === 0 &&
+			configDir.length > 0
+		) {
+			return "No provider configured. Add a provider to start chatting.";
+		}
+		return null;
+	}, [info, isLoadingProviders, providers.length, configDir]);
 
 	const resize = () => {
 		const textarea = textareaRef.current;
@@ -73,98 +114,42 @@ function RouteComponent() {
 		setInfo(null);
 	};
 
-	const finalizeStream = useCallback(
-		(aiText: string, stopped: boolean) => {
-			setMessages((prev) => {
-				if (!aiText) return prev;
-				return [...prev, { role: "ai", content: aiText }];
-			});
-			setStreamContent("");
-			setIsStreaming(false);
-			abortControllerRef.current = null;
-			if (stopped) setInfo("Stopped.");
-		},
-		[],
-	);
-
-	const startStream = useCallback(
-		async (
+	// Fire-and-forget run start: the POST returns { runId } immediately; all
+	// stream relays arrive via the global firehose.
+	const submitMessage = useCallback(
+		(
 			targetSessionId: string,
 			message: string,
 			streamAgent?: string,
 			streamModel?: string,
 		) => {
-			if (!configDir || isStreaming) return;
-
-			setMessages((prev) => {
-				const last = prev[prev.length - 1];
-				if (last && last.role === "human" && last.content === message) {
-					return prev;
-				}
-				return [...prev, { role: "human", content: message }];
-			});
-
+			const store = useChatSessionStore.getState();
+			if (store.getSession(targetSessionId)?.status === "streaming") return;
+			store.appendHuman(targetSessionId, message);
+			store.setStatus(targetSessionId, "streaming");
 			setText("");
 			resize();
 			setError(null);
 			setInfo(null);
-			setIsStreaming(true);
-			setStreamContent("");
 
-			let aiText = "";
-			const controller = new AbortController();
-			abortControllerRef.current = controller;
-
-			try {
-				for await (const event of streamChatMessage(
-					API_BASE_URL,
-					targetSessionId,
-					{
-						message,
-						configDir,
-						agentProfile: streamAgent || undefined,
-						model: streamModel || undefined,
-					},
-					controller.signal,
-				)) {
-					if (event.type === "messages") {
-						const deltas = Array.isArray(event.data) ? event.data : [];
-						const chunk = deltas
-							.map((d) =>
-								typeof d.content === "string" ? d.content : "",
-							)
-							.join("");
-						if (chunk) {
-							aiText += chunk;
-							setStreamContent(aiText);
-						}
-					} else if (event.type === "error") {
-						const msg =
-							typeof event.data === "object" &&
-							event.data &&
-							"message" in event.data
-								? String(event.data.message)
-								: JSON.stringify(event.data);
-						setError(msg);
-					} else if (event.type === "__end__") {
-						break;
-					}
-				}
-				finalizeStream(aiText, false);
-			} catch (err) {
-				if (err instanceof DOMException && err.name === "AbortError") {
-					finalizeStream(aiText, true);
-				} else {
-					finalizeStream(aiText, false);
+			void startRun(API_BASE_URL, targetSessionId, {
+				message,
+				configDir,
+				agentProfile: streamAgent || undefined,
+				model: streamModel || undefined,
+			})
+				.then(({ runId }) => {
+					useChatSessionStore.getState().setActiveRun(targetSessionId, runId);
+				})
+				.catch((err) => {
+					useChatSessionStore.getState().setStatus(targetSessionId, "idle");
 					setError(err instanceof Error ? err.message : String(err));
-				}
-			}
+				});
 		},
-		[configDir, finalizeStream, isStreaming],
+		[configDir],
 	);
 
 	useEffect(() => {
-		setMessages([]);
 		setHistoryLoaded(false);
 		setError(null);
 		setInfo(null);
@@ -174,7 +159,7 @@ function RouteComponent() {
 		fetchMessages(API_BASE_URL, sessionId)
 			.then((msgs) => {
 				if (cancelled) return;
-				setMessages(msgs);
+				useChatSessionStore.getState().applyHistory(sessionId, msgs);
 				setHistoryLoaded(true);
 			})
 			.catch((err) => {
@@ -204,12 +189,7 @@ function RouteComponent() {
 		if (autoSubmittedRef.current.has(key)) return;
 		autoSubmittedRef.current.add(key);
 
-		void startStream(
-			sessionId,
-			pendingPrompt,
-			agentProfile || undefined,
-			model || undefined,
-		);
+		submitMessage(sessionId, pendingPrompt, agentProfile || undefined, model || undefined);
 		void navigate({
 			to: "/u/chat",
 			search: { sessionId },
@@ -222,8 +202,10 @@ function RouteComponent() {
 		isStreaming,
 		createSession.isPending,
 		configDir,
+		agentProfile,
+		model,
 		navigate,
-		startStream,
+		submitMessage,
 	]);
 
 	const handleSubmit = () => {
@@ -232,12 +214,7 @@ function RouteComponent() {
 		if (isStreaming) return;
 
 		if (sessionId) {
-			void startStream(
-				sessionId,
-				trimmed,
-				agentProfile || undefined,
-				model || undefined,
-			);
+			submitMessage(sessionId, trimmed, agentProfile || undefined, model || undefined);
 			return;
 		}
 
@@ -253,7 +230,7 @@ function RouteComponent() {
 				model: model || undefined,
 			},
 			{
-				onSuccess: (created) => {
+				onSuccess: (created: { sessionId: string }) => {
 					setText("");
 					resize();
 					void navigate({
@@ -262,7 +239,7 @@ function RouteComponent() {
 						replace: true,
 					});
 				},
-				onError: (err) => {
+				onError: (err: Error) => {
 					setError(
 						err instanceof Error ? err.message : "Failed to start session",
 					);
@@ -279,13 +256,15 @@ function RouteComponent() {
 	};
 
 	const handleStop = () => {
-		if (abortControllerRef.current) {
-			abortControllerRef.current.abort();
-		}
 		if (createSession.isPending) {
 			createSession.reset();
 			setInfo("Stopped.");
+			return;
 		}
+		if (!sessionId) return;
+		void cancelRun(API_BASE_URL, sessionId).catch((err) => {
+			setError(err instanceof Error ? err.message : String(err));
+		});
 	};
 
 	useEffect(() => {
@@ -296,14 +275,14 @@ function RouteComponent() {
 		<div className="relative flex flex-col h-full text-sm">
 			<ChatPanel
 				sessionId={sessionId}
-				messages={messages}
+				messages={panelMessages}
 				isStreaming={isStreaming}
 				streamContent={streamContent}
 			/>
 			<Composer
 				text={text}
 				error={error}
-				info={info}
+				info={composerInfo}
 				onTextChange={handleChange}
 				onSubmit={handleSubmit}
 				onKeyDown={handleKeyDown}

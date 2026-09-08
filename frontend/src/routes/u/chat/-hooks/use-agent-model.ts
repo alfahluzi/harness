@@ -93,17 +93,19 @@ export function useAgentModelSelection() {
 		modelStatus = "No models found";
 	}
 
-return {
+	return {
 		agentProfile,
 		setAgentProfile,
 		model,
 		setModel,
 		agents: rawAgents,
 		models,
+		providers,
 		activeAgent,
 		providerId,
 		hasProvider: providerId !== null,
 		modelStatus,
 		isLoadingAgents: agentsQuery.isLoading,
+		isLoadingProviders: providersQuery.isLoading,
 	};
 }

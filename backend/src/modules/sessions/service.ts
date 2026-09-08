@@ -24,30 +24,53 @@ async function consumeRunToBus(
 		)) {
 			if (part.event === "error") {
 				streamBus.publish(record.id, runId, "error", part.data);
-				svc.repository.setError(record.id, String(part.data), Date.now());
+				if (!svc.isDeleted(record.id)) {
+					svc.repository.setError(record.id, String(part.data), Date.now());
+				}
 				return;
 			}
 			streamBus.publish(record.id, runId, part.event, part.data);
 		}
-		// Normal completion — persist FIRST, then publish done (audit fix #4)
-		const state = await svc.langgraphClient.threads.getState(
-			record.childThreadId,
-		);
-		svc.repository.setResult(record.id, state.values, Date.now());
-		streamBus.publish(record.id, runId, "done", null);
+		// Normal completion — persist FIRST, then publish done (audit fix #4).
+		// Fetch state and persist inside a try so a getState failure classifies
+		// correctly and does not misattribute a network error to the run.
+		try {
+			const state = await svc.langgraphClient.threads.getState(
+				record.childThreadId,
+			);
+			if (!svc.isDeleted(record.id)) {
+				svc.repository.setResult(record.id, state.values, Date.now());
+			}
+			streamBus.publish(record.id, runId, "done", null);
+		} catch (persistErr) {
+			// Stream completed successfully but result persistence failed.
+			// Publish a distinct terminal so client knows the run completed but
+			// the result is unavailable via GET /sessions/:id/result.
+			const msg = String(persistErr);
+			streamBus.publish(record.id, runId, "error", {
+				error: `run completed but result persist failed: ${msg}`,
+			});
+			if (!svc.isDeleted(record.id)) {
+				svc.repository.setError(record.id, msg, Date.now());
+			}
+		}
 	} catch (e) {
 		// Distinguish cancel vs error (audit fix #9)
 		const msg = String(e);
 		const isCancel = /cancel|aborted/i.test(msg);
 		if (isCancel) {
 			streamBus.publish(record.id, runId, "cancelled", null);
-			svc.repository.setStatus(record.id, "cancelled");
+			if (!svc.isDeleted(record.id)) {
+				svc.repository.setStatus(record.id, "cancelled");
+			}
 		} else {
 			streamBus.publish(record.id, runId, "error", { error: msg });
-			svc.repository.setError(record.id, msg, Date.now());
+			if (!svc.isDeleted(record.id)) {
+				svc.repository.setError(record.id, msg, Date.now());
+			}
 		}
 	} finally {
-		if (record.parentThreadId) {
+		if (record.parentThreadId && !svc.isDeleted(record.id)) {
 			svc.notifyParent(record).catch((err) =>
 				console.error(`notifyParent failed for ${record.id}:`, err),
 			);
@@ -62,6 +85,7 @@ export class SessionService {
 	// Per-childThreadId promise chain serializes check-then-act around
 	// assertThreadIdle + runs.create (TOCTOU race, audit fix #3).
 	private mutexes = new Map<string, Promise<void>>();
+	private deletedSessions = new Set<string>();
 
 	constructor(repo: SessionRepository = new SessionRepository(), client?: Client) {
 		this.langgraph_client = client ?? new Client({ apiUrl: config.langgraphUrl });
@@ -77,16 +101,17 @@ export class SessionService {
 		const next = new Promise<void>((res) => {
 			release = res;
 		});
-		this.mutexes.set(
-			threadId,
-			prev.then(() => next),
-		);
+		// Store the chain in a local and compare against IT in the delete guard.
+		// The map value is `prev.then(() => next)` (a distinct promise object),
+		// NOT `next` — a raw `=== next` guard would never fire and leak the map.
+		const chain = prev.then(() => next);
+		this.mutexes.set(threadId, chain);
 		await prev;
 		try {
 			return await fn();
 		} finally {
 			release();
-			if (this.mutexes.get(threadId) === next) this.mutexes.delete(threadId);
+			if (this.mutexes.get(threadId) === chain) this.mutexes.delete(threadId);
 		}
 	}
 
@@ -283,13 +308,26 @@ export class SessionService {
 		});
 
 		if (!siblingsStillRunning) {
-			await this.langgraph_client.runs.create(
-				record.parentThreadId,
-				config.graphId,
-				{
-					input: null,
-				},
-			);
+			// Wake the parent agent to process the notification. Skip if the
+			// parent already has an active run — the updateState message above
+			// stays in the thread and will surface on the parent's next turn.
+			try {
+				await this.withThreadLock(record.parentThreadId, async () => {
+					await this.assertThreadIdle(record.parentThreadId!);
+					await this.langgraph_client.runs.create(
+						record.parentThreadId!,
+						config.graphId,
+						{
+							input: null,
+						},
+					);
+				});
+			} catch (e) {
+				if (!(e instanceof ThreadBusyError)) throw e;
+				console.warn(
+					`notifyParent skipped runs.create for ${record.id}: parent thread busy`,
+				);
+			}
 		}
 	}
 
@@ -328,6 +366,12 @@ export class SessionService {
 		} catch {
 			return undefined;
 		}
+	}
+
+	/** Called by consumeRunToBus to check if the session was deleted mid-run.
+	 * When true, callers should skip DB writes and parent-thread notification. */
+	isDeleted(id: string): boolean {
+		return this.deletedSessions.has(id);
 	}
 
 	async getResult(id: string) {
@@ -392,6 +436,7 @@ export class SessionService {
 			undefined,
 			{ model: opts?.model },
 		);
+		let runId!: string;
 		await this.withThreadLock(r.childThreadId, async () => {
 			await this.assertThreadIdle(r.childThreadId);
 			let run;
@@ -402,7 +447,7 @@ export class SessionService {
 					{
 						input: { messages: [{ role: "human", content: message }] },
 						config: runtime,
-						streamMode: ["messages-tuple", "updates"], // token-by-token + progress per node
+						streamMode: ["messages-tuple", "updates"],
 					},
 				);
 			} catch (e) {
@@ -411,16 +456,17 @@ export class SessionService {
 			}
 			this.repo.setRunId(r.id, run.run_id);
 			this.repo.setStatus(r.id, "running");
+			runId = run.run_id;
 			// DETACH: detached task with explicit .catch() (audit fix #2)
 			consumeRunToBus(this, r, run.run_id).catch((e) => {
 				console.error(`consumeRunToBus unhandled for ${r.id}:`, e);
-				// Last-ditch terminal envelope so client never hangs
 				streamBus.publish(r.id, run.run_id, "error", { error: String(e) });
-				this.repo.setError(r.id, String(e), Date.now());
+				if (!this.isDeleted(r.id)) {
+					this.repo.setError(r.id, String(e), Date.now());
+				}
 			});
 		});
-		const final = this.repo.getOrThrow(id);
-		return { runId: final.runId, status: "running" };
+		return { runId, status: "running" };
 	}
 
 	/** Best-effort cancel of the active run. The consumeRunToBus loop catches
@@ -466,9 +512,22 @@ export class SessionService {
 		if (!Array.isArray(messages)) return { messages: [] };
 		return {
 			messages: messages.map((m) => {
-				const msg = m as { role?: unknown; content?: unknown } | null;
+				const msg = m as {
+					type?: unknown;
+					role?: unknown;
+					content?: unknown;
+				} | null;
+				// LangGraph canonical field is `type` ("human" | "ai" | "tool" |
+				// "system"); some app-shaped messages use `role`. Prefer `type`,
+				// fall back to `role`, then to "unknown".
+				const raw =
+					typeof msg?.type === "string"
+						? msg.type
+						: typeof msg?.role === "string"
+							? msg.role
+							: "unknown";
 				return {
-					role: typeof msg?.role === "string" ? msg.role : "unknown",
+					role: raw,
 					content: this.stringifyContent(msg?.content),
 				};
 			}),
@@ -477,13 +536,25 @@ export class SessionService {
 
 	async delete(id: string) {
 		const r = this.repo.getOrThrow(id);
-		if (r.status === "running" && r.runId) {
-			await this.langgraph_client.runs
-				.cancel(r.childThreadId, r.runId)
+		// Mark BEFORE cancel/delete so detached consumeRunToBus tasks can bail
+		// on their next persist attempt.
+		this.deletedSessions.add(id);
+		try {
+			if (r.status === "running" && r.runId) {
+				await this.langgraph_client.runs
+					.cancel(r.childThreadId, r.runId)
+					.catch(() => {});
+			}
+			await this.langgraph_client.threads
+				.delete(r.childThreadId)
 				.catch(() => {});
+			this.repo.delete(id);
+		} finally {
+			// Keep the tombstone briefly so late writes still bail, then GC it.
+			// consumeRunToBus finishes in single-digit seconds typically; 60s is
+			// generous enough to cover any late notifyParent chain.
+			setTimeout(() => this.deletedSessions.delete(id), 60_000);
 		}
-		await this.langgraph_client.threads.delete(r.childThreadId).catch(() => {});
-		this.repo.delete(id);
 	}
 
 	/**

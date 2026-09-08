@@ -112,17 +112,18 @@ app.all("/mcp", async (c) => {
 	return mcpTransport.handleRequest(c);
 });
 
-process.on("SIGINT", async () => {
-	const sessionService = new SessionService();
-	await sessionService.cancelAll();
+async function shutdown(signal: string) {
+	console.log(`received ${signal}, cancelling active sessions...`);
+	try {
+		await sessionService.cancelAll();
+	} catch (e) {
+		console.error(`cancelAll failed during ${signal} shutdown:`, e);
+	}
 	process.exit(0);
-});
+}
 
-process.on("SIGTERM", async () => {
-	const sessionService = new SessionService();
-	await sessionService.cancelAll();
-	process.exit(0);
-});
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 const port = Number(process.env.PORT ?? 3001);
 
