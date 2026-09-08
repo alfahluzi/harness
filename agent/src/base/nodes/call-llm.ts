@@ -3,7 +3,7 @@ import { BaseMessage } from "@langchain/core/messages";
 import { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { ensureConfiguration } from "../.libs/configuration.js";
 import { GraphAnnotation } from "../.libs/state.js";
-import { tools } from "../tools/index.js";
+import { buildRuntimeTools } from "../tools/runtime.js";
 import { getStoreFromConfigOrThrow } from "../.libs/utils.js";
 import { ChatOpenAI } from "@langchain/openai";
 
@@ -37,6 +37,7 @@ export async function callModel(
 			apiKey: configurable.apiKey,
 		},
 	});
+	const tools = await buildRuntimeTools(configurable);
 	const boundLLM = llm.bindTools(tools, {
 		tool_choice: "auto",
 	});

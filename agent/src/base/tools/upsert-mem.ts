@@ -31,7 +31,7 @@ async function upsertMemory(
 }
 
 export const upsertMemoryTool = tool(upsertMemory, {
-	name: "upsertMemory",
+	name: "upsert_memory",
 	description:
 		"Upsert a memory in the database. If a memory conflicts with an existing one, \
     update the existing one by passing in the memory_id instead of creating a duplicate. \

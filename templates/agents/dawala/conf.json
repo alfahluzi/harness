@@ -5,8 +5,12 @@
   "temperature": 0.75,
   "called": "after Gareng",
   "tools": {
-    "allow": ["read", "glob", "grep", "bash", "lsp_*", "todowrite", "skill"],
-    "deny": ["write", "edit", "task", "webfetch", "websearch", "question"]
+    "allow": [
+      "read_file", "list_directory", "shell",
+      "list_tables", "describe_table", "run_query", "upsert_memory",
+      "list_skills", "get_skill"
+    ],
+    "deny": ["write_file", "delete_file", "http_fetch"]
   },
   "description": "QA / exploratory: menjalankan/mengetes hasil kerja Gareng secara literal, coba edge case tidak lazim."
 }

@@ -122,7 +122,7 @@ export function createSqlTools(config: SqlToolsConfig): StructuredTool[] {
 			}
 		},
 		{
-			name: "listTables",
+			name: "list_tables",
 			description:
 				"List tables/views in the database, optionally filtered to an allow-list.",
 			schema: listTablesSchema,
@@ -167,7 +167,7 @@ export function createSqlTools(config: SqlToolsConfig): StructuredTool[] {
 			}
 		},
 		{
-			name: "describeTable",
+			name: "describe_table",
 			description:
 				"Describe a table's columns. Rejects tables outside the allow-list.",
 			schema: describeTableSchema,
@@ -243,7 +243,7 @@ export function createSqlTools(config: SqlToolsConfig): StructuredTool[] {
 			}
 		},
 		{
-			name: "runQuery",
+			name: "run_query",
 			description:
 				"Run a single read-only SQL statement (SELECT/WITH only). Writes, DDL, \
 				multi-statement, and blocked keywords are rejected. Results auto-limited and \

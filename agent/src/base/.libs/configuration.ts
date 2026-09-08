@@ -38,6 +38,14 @@ export const ConfigurationAnnotation = Annotation.Root({
 		reducer: (_, v) => v,
 		default: () => DEFAULT_MODEL_NAME,
 	}),
+	allowedTools: Annotation<string[]>({
+		reducer: (_, v) => v,
+		default: () => [],
+	}),
+	deniedTools: Annotation<string[]>({
+		reducer: (_, v) => v,
+		default: () => [],
+	}),
 });
 
 export function ensureConfiguration(config: LangGraphRunnableConfig) {
@@ -50,5 +58,7 @@ export function ensureConfiguration(config: LangGraphRunnableConfig) {
 		providerUrl: c?.provider_url ?? c?.providerUrl ?? DEFAULT_PROVIDER_URL,
 		apiKey: c?.api_key ?? c?.apiKey ?? DEFAULT_API_KEY,
 		modelName: c?.model_name ?? c?.modelName ?? DEFAULT_MODEL_NAME,
+		allowedTools: (c?.allowed_tools ?? c?.allowedTools ?? []) as string[],
+		deniedTools: (c?.denied_tools ?? c?.deniedTools ?? []) as string[],
 	};
 }

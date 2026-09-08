@@ -308,7 +308,7 @@ export class FileTools {
 			(input) =>
 				this.runTool("file:readFile", input, () => this.readFileOp(input)),
 			{
-				name: "readFile",
+				name: "read_file",
 				description:
 					"Read a UTF-8 text file. Rejects paths outside the sandbox root " +
 					"and files exceeding the size limit. " +
@@ -324,7 +324,7 @@ export class FileTools {
 			(input) =>
 				this.runTool("file:writeFile", input, () => this.writeFileOp(input)),
 			{
-				name: "writeFile",
+				name: "write_file",
 				description:
 					"Write UTF-8 text to a file (creates parent dirs). Rejects paths " +
 					"outside the sandbox root and writes exceeding the size limit. " +
@@ -342,7 +342,7 @@ export class FileTools {
 					this.listDirectoryOp(input),
 				),
 			{
-				name: "listDirectory",
+				name: "list_directory",
 				description:
 					"List entries in a directory relative to the sandbox root. " +
 					"Returns JSON array of {name, isFile, isDirectory, size}. " +
@@ -358,7 +358,7 @@ export class FileTools {
 			(input) =>
 				this.runTool("file:deleteFile", input, () => this.deleteFileOp(input)),
 			{
-				name: "deleteFile",
+				name: "delete_file",
 				description:
 					"Delete a file. Rejects paths outside the sandbox root. " +
 					"ONLY available when readOnly=false. " +

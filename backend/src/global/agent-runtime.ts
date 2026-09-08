@@ -22,12 +22,15 @@ export interface AgentRuntimeConfig {
 		api_key: string;
 		model_name: string;
 		system_prompt: string;
+		allowed_tools: string[];
+		denied_tools: string[];
 	};
 }
 
 interface AgentConf {
 	providerId?: string;
 	modelId?: string;
+	tools?: { allow?: string[]; deny?: string[] };
 }
 
 async function readProfile(dir: string): Promise<{ prompt: string; conf: AgentConf }> {
@@ -145,6 +148,8 @@ export async function resolveAgentRuntimeConfig(
 			api_key: provider.apiKey,
 			model_name: modelName,
 			system_prompt: prompt,
+			allowed_tools: conf.tools?.allow ?? [],
+			denied_tools: conf.tools?.deny ?? [],
 		},
 	};
 }

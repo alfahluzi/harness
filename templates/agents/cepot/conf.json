@@ -5,8 +5,13 @@
   "temperature": 0.65,
   "called": "after Dawala",
   "tools": {
-    "allow": ["read", "glob", "grep", "lsp_*"],
-    "deny": ["write", "edit", "bash", "task", "webfetch", "websearch", "question"]
+    "allow": [
+      "read_file", "list_directory",
+      "list_tables", "describe_table", "run_query",
+      "list_agents", "get_agent",
+      "list_skills", "get_skill"
+    ],
+    "deny": ["write_file", "delete_file", "shell", "http_fetch"]
   },
   "description": "Gatekeeper sebelum kode di-approve. Menilai kualitas solusi DAN risiko dampak (security, data loss, breaking change, cost)."
 }

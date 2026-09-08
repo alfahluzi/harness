@@ -261,7 +261,7 @@ export function createHttpTools(config: HttpToolsConfig) {
 			jsonBody?: unknown;
 		}) => httpFetchImpl(input, config),
 		{
-			name: "httpFetch",
+			name: "http_fetch",
 			description: HTTP_TOOL_DESCRIPTION,
 			schema: httpFetchSchema,
 		},

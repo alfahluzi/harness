@@ -16,6 +16,31 @@ import { createHttpTools, type HttpToolsConfig } from "./http-tools.js";
 import { createSqlTools, type SqlToolsConfig } from "./sql-tools.js";
 import { loadSessionManagerTools } from "./mcp-client.js";
 
+/**
+ * Filter a tool list by allow/deny rules (matched against `tool.name`).
+ *
+ * Rules:
+ * - `allow` empty/undefined → all tools pass (subject to `deny`).
+ * - `allow` non-empty → only names in allow pass.
+ * - `deny` always wins over allow.
+ * - Matching is exact string; wildcards intentionally NOT supported (keeps
+ *   semantics predictable — a rename in a tool factory is a breaking change
+ *   the agent should notice, not silently absorb via a glob).
+ */
+export function filterTools(
+	tools: StructuredTool[],
+	allow?: string[],
+	deny?: string[],
+): StructuredTool[] {
+	const allowSet = allow && allow.length > 0 ? new Set(allow) : null;
+	const denySet = deny && deny.length > 0 ? new Set(deny) : null;
+	return tools.filter((t) => {
+		if (denySet?.has(t.name)) return false;
+		if (allowSet && !allowSet.has(t.name)) return false;
+		return true;
+	});
+}
+
 export interface ToolsConfig {
 	/**
 	 * If provided, the `shell` tool is included. Omit the key to leave shell
@@ -46,7 +71,10 @@ export interface ToolsConfig {
  * });
  * ```
  */
-export function getAllTools(config: ToolsConfig): StructuredTool[] {
+export function getAllTools(
+	config: ToolsConfig,
+	opts?: { allow?: string[]; deny?: string[] },
+): StructuredTool[] {
 	const tools: StructuredTool[] = [upsertMemoryTool];
 
 	if (config.shell !== undefined) {
@@ -57,7 +85,7 @@ export function getAllTools(config: ToolsConfig): StructuredTool[] {
 	tools.push(createHttpTools(config.http));
 	tools.push(...createSqlTools(config.sql));
 
-	return tools;
+	return filterTools(tools, opts?.allow, opts?.deny);
 }
 
 /**
@@ -65,10 +93,14 @@ export function getAllTools(config: ToolsConfig): StructuredTool[] {
  * from the backend `/mcp` endpoint. Async because it performs an MCP
  * handshake. Call once at graph build time, not per-invocation.
  */
-export async function getAllToolsAsync(config: ToolsConfig): Promise<StructuredTool[]> {
-	const local = getAllTools(config);
+export async function getAllToolsAsync(
+	config: ToolsConfig,
+	opts?: { allow?: string[]; deny?: string[] },
+): Promise<StructuredTool[]> {
+	const local = getAllTools(config, opts);
 	const sessionTools = await loadSessionManagerTools();
-	return [...local, ...sessionTools];
+	const filteredSession = filterTools(sessionTools, opts?.allow, opts?.deny);
+	return [...local, ...filteredSession];
 }
 
 // Re-export the individual factories + config types so callers can build

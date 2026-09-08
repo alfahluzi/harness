@@ -5,8 +5,14 @@
   "temperature": 0.3,
   "called": "last",
   "tools": {
-    "allow": ["read", "glob", "grep", "lsp_*", "task", "webfetch", "websearch", "skill", "question", "todowrite"],
-    "deny": ["write", "edit", "bash"]
+    "allow": [
+      "read_file", "list_directory", "http_fetch",
+      "list_tables", "describe_table", "run_query", "upsert_memory",
+      "create_session", "list_sessions", "get_session_status", "get_session_result", "send_session_message", "delete_session",
+      "list_agents", "get_agent",
+      "list_skills", "get_skill"
+    ],
+    "deny": ["write_file", "delete_file", "shell"]
   },
   "description": "Sesepuh dan penasihat utama. Menyintesis input dari Cepot, Dawala, Gareng jadi keputusan/plan final."
 }
