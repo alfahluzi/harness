@@ -53,7 +53,7 @@ export function Composer({
 	const note = error ?? info;
 
 	return (
-		<div className="absolute bottom-0 left-0 w-full flex justify-center my-2 pr-2">
+		<div className="w-full flex justify-center mb-2 pr-2">
 			<div
 				className={
 					"border rounded-lg border-neutral-300 dark:border-neutral-700 " +

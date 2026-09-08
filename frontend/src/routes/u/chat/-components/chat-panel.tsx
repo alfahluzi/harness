@@ -1,10 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useActiveWorkdir } from "../../../../hooks/use-active-workdir";
 import { useSessions } from "../../../../hooks/use-sessions";
 import type { SessionSummary } from "@/lib/api";
 import type { ChatMessage } from "@/lib/chat-types";
 import { ChatRequest } from "./chat-request";
+
+function groupByHuman(messages: ChatMessage[]): ChatMessage[][] {
+	const groups: ChatMessage[][] = [];
+	for (const msg of messages) {
+		if (msg.role === "human" || groups.length === 0) groups.push([msg]);
+		else groups[groups.length - 1]!.push(msg);
+	}
+	return groups;
+}
 
 type ChatPanelProps = {
 	sessionId?: string;
@@ -39,6 +48,8 @@ export function ChatPanel({
 		? sessions.data?.find((s) => s.id === sessionId)
 		: undefined;
 
+	const groups = useMemo(() => groupByHuman(messages), [messages]);
+
 	useEffect(() => {
 		const el = scrollRef.current;
 		if (!el) return;
@@ -72,18 +83,24 @@ export function ChatPanel({
 				)}
 			</header>
 
-			<div className="max-w-3xl w-full px-4 flex-1">
+			<div className="max-w-3xl w-full px-4 flex-1 flex flex-col gap-4">
 				{sessionId && (
 					<div className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
 						Session {sessionId.slice(0, 8)}
 					</div>
 				)}
-				<ChatRequest
-					messages={messages}
-					last
-					isStreaming={isStreaming}
-					streamContent={streamContent}
-				/>
+				{groups.map((group, i) => {
+					const isLast = i === groups.length - 1;
+					return (
+						<ChatRequest
+							key={i}
+							messages={group}
+							last={isLast}
+							isStreaming={isLast && isStreaming}
+							streamContent={isLast ? streamContent : ""}
+						/>
+					);
+				})}
 			</div>
 		</div>
 	);
