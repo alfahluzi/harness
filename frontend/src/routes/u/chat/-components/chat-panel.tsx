@@ -65,7 +65,7 @@ export function ChatPanel({
 			ref={scrollRef}
 			className="h-full w-full flex flex-col gap-2 items-center justify-start my-2 overflow-y-auto scrollbar-thin"
 		>
-			<header className="sticky top-0 z-10 w-full max-w-3xl px-4 py-2 bg-neutral-50/90 dark:bg-neutral-950/90 backdrop-blur">
+			<header className="sticky top-0 z-10 w-full  px-4 py-2 ">
 				{!configDir ? (
 					<WorkspaceGuard />
 				) : sessionId && session ? (
@@ -142,9 +142,6 @@ function SessionHeader({ session }: { session: SessionSummary }) {
 					{title}
 				</span>
 			</div>
-			<span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700 dark:border-slate-500/20 dark:bg-slate-500/10 dark:text-slate-300">
-				active
-			</span>
 		</div>
 	);
 }

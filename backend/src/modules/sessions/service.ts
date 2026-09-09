@@ -1052,6 +1052,11 @@ export class SessionService {
 			r.childThreadId,
 			{ limit: 500 },
 		)) as Array<{ checkpoint: { checkpoint_id?: string } }>;
+		console.log(
+			`[switchBranch] target=${checkpointId} thread=${r.childThreadId} history.len=${history.length} ids=${history
+				.map((h) => h.checkpoint?.checkpoint_id?.slice(-12))
+				.join(",")}`,
+		);
 		const exists = history.some(
 			(h) => h.checkpoint?.checkpoint_id === checkpointId,
 		);
