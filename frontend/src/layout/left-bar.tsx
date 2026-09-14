@@ -5,6 +5,8 @@ import { NavigationPanel } from "./navigation-panel";
 export interface NavigationLeftItem {
 	id: string;
 	label: string;
+	/** Tooltip text; falls back to `label` when omitted. */
+	title?: string;
 	icon: ComponentType<{ className?: string }>;
 	to?: string;
 	child?: React.ReactNode;
@@ -71,6 +73,7 @@ export function LeftBar({ items }: LeftDockProps) {
 								key={item.id}
 								to={item.to}
 								aria-label={item.label}
+								title={item.title ?? item.label}
 								className={className}
 							>
 								<Icon className="h-5 w-5" />
@@ -83,6 +86,7 @@ export function LeftBar({ items }: LeftDockProps) {
 							type="button"
 							aria-label={item.label}
 							aria-pressed={isActive}
+							title={item.title ?? item.label}
 							onClick={() => handleActivate(item.id)}
 							className={className}
 						>

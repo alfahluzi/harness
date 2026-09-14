@@ -1,0 +1,21 @@
+{
+  "id": "mermaid-renderer",
+  "name": "Mermaid Renderer",
+  "version": "0.1.0",
+  "kind": "ui",
+  "description": "Custom toolUi renderer for tool calls named `mermaid` (Fase 3).",
+  "entry": {
+    "ui": "./ui/index.tsx",
+    "backend": "./backend/index.ts"
+  },
+  "slots": [
+    "toolUi:mermaid"
+  ],
+  "permissions": {},
+  "ui": {
+    "bundle": "./ui/index.tsx"
+  },
+  "backend": {
+    "entry": "./backend/index.ts"
+  }
+}

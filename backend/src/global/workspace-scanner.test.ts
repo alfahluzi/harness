@@ -4,6 +4,8 @@ import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import {
 	mergeLayered,
+	mergeLayered3,
+	defaultSystemPluginDir,
 	resolveSource,
 	scanLayer,
 	findWorkspaceDirs,
@@ -293,5 +295,124 @@ describe("findWorkspaceDirs", () => {
 		expect(result.sort()).toEqual(
 			[join(tmpRoot, "ws1", ".nusa"), join(tmpRoot, "ws2", ".nusa")].sort(),
 		);
+	});
+});
+
+describe("mergeLayered3", () => {
+	test("empty when all three layers null", async () => {
+		const result = await mergeLayered3(null, null, null, "plugin.json");
+		expect(result).toEqual([]);
+	});
+
+	test("system-global-only entries", async () => {
+		const systemDir = join(tmpRoot, "system", "plugins");
+		await makeEntry(systemDir, "alpha", "plugin.json");
+
+		const result = await mergeLayered3(null, null, systemDir, "plugin.json");
+		expect(result).toEqual([
+			{ name: "alpha", source: "system-global", dir: join(systemDir, "alpha") },
+		]);
+	});
+
+	test("workspace-local-only entries", async () => {
+		const localDir = join(tmpRoot, "local", "plugins");
+		await makeEntry(localDir, "alpha", "plugin.json");
+
+		const result = await mergeLayered3(localDir, null, null, "plugin.json");
+		expect(result).toEqual([
+			{ name: "alpha", source: "workspace-local", dir: join(localDir, "alpha") },
+		]);
+	});
+
+	test("workspace-global-only entries", async () => {
+		const globalDir = join(tmpRoot, "global", "plugins");
+		await makeEntry(globalDir, "alpha", "plugin.json");
+
+		const result = await mergeLayered3(null, globalDir, null, "plugin.json");
+		expect(result).toEqual([
+			{ name: "alpha", source: "workspace-global", dir: join(globalDir, "alpha") },
+		]);
+	});
+
+	test("collision: workspace-local wins over workspace-global", async () => {
+		const localDir = join(tmpRoot, "local", "plugins");
+		const globalDir = join(tmpRoot, "global", "plugins");
+		await makeEntry(localDir, "shared", "plugin.json");
+		await makeEntry(globalDir, "shared", "plugin.json");
+
+		const result = await mergeLayered3(localDir, globalDir, null, "plugin.json");
+		expect(result).toHaveLength(1);
+		expect(result[0]?.source).toBe("workspace-local");
+		expect(result[0]?.dir).toBe(join(localDir, "shared"));
+	});
+
+	test("collision: workspace-global wins over system-global", async () => {
+		const globalDir = join(tmpRoot, "global", "plugins");
+		const systemDir = join(tmpRoot, "system", "plugins");
+		await makeEntry(globalDir, "shared", "plugin.json");
+		await makeEntry(systemDir, "shared", "plugin.json");
+
+		const result = await mergeLayered3(null, globalDir, systemDir, "plugin.json");
+		expect(result).toHaveLength(1);
+		expect(result[0]?.source).toBe("workspace-global");
+		expect(result[0]?.dir).toBe(join(globalDir, "shared"));
+	});
+
+	test("collision: workspace-local wins over all three", async () => {
+		const localDir = join(tmpRoot, "local", "plugins");
+		const globalDir = join(tmpRoot, "global", "plugins");
+		const systemDir = join(tmpRoot, "system", "plugins");
+		await makeEntry(localDir, "shared", "plugin.json");
+		await makeEntry(globalDir, "shared", "plugin.json");
+		await makeEntry(systemDir, "shared", "plugin.json");
+
+		const result = await mergeLayered3(localDir, globalDir, systemDir, "plugin.json");
+		expect(result).toHaveLength(1);
+		expect(result[0]?.source).toBe("workspace-local");
+		expect(result[0]?.dir).toBe(join(localDir, "shared"));
+	});
+
+	test("additive across different names", async () => {
+		const localDir = join(tmpRoot, "local", "plugins");
+		const globalDir = join(tmpRoot, "global", "plugins");
+		const systemDir = join(tmpRoot, "system", "plugins");
+		await makeEntry(localDir, "local-only", "plugin.json");
+		await makeEntry(globalDir, "global-only", "plugin.json");
+		await makeEntry(systemDir, "system-only", "plugin.json");
+
+		const result = await mergeLayered3(localDir, globalDir, systemDir, "plugin.json");
+		expect(result).toHaveLength(3);
+		expect(result.map((r) => [r.name, r.source])).toEqual([
+			["global-only", "workspace-global"],
+			["local-only", "workspace-local"],
+			["system-only", "system-global"],
+		]);
+	});
+
+	test("sorted alphabetically regardless of layer", async () => {
+		const localDir = join(tmpRoot, "local", "plugins");
+		const globalDir = join(tmpRoot, "global", "plugins");
+		const systemDir = join(tmpRoot, "system", "plugins");
+		await makeEntry(localDir, "zebra", "plugin.json");
+		await makeEntry(globalDir, "mike", "plugin.json");
+		await makeEntry(systemDir, "alpha", "plugin.json");
+
+		const result = await mergeLayered3(localDir, globalDir, systemDir, "plugin.json");
+		expect(result.map((r) => r.name)).toEqual(["alpha", "mike", "zebra"]);
+	});
+
+	test("marker check: directory without plugin.json not included", async () => {
+		const systemDir = join(tmpRoot, "system", "plugins");
+		await makeEntry(systemDir, "real", "plugin.json");
+		await mkdir(join(systemDir, "no-marker"), { recursive: true });
+
+		const result = await mergeLayered3(null, null, systemDir, "plugin.json");
+		expect(result).toEqual([
+			{ name: "real", source: "system-global", dir: join(systemDir, "real") },
+		]);
+	});
+
+	test("defaultSystemPluginDir returns ~/.config/puna", () => {
+		expect(defaultSystemPluginDir()).toBe(join(homedir(), ".config", "puna"));
 	});
 });

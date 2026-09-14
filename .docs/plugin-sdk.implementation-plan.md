@@ -226,4 +226,23 @@ Per-Fase checklist (must pass before next Fase opens):
 
 | Date | Fase | Task | Status | Notes |
 |------|------|------|--------|-------|
-|      |      |      |        |       |
+| 2026-09-14 | 0 | F0-T1 | done | `workspaces: ["packages/*"]` added to root package.json |
+| 2026-09-14 | 0 | F0-T2 | done | 5 SDK pkgs + bin/puna-plugin.mjs stub; `bun pm ls` resolves workspace:* |
+| 2026-09-14 | 0 | F0-T3 | done | `agent/scripts/README.md` placeholder (Fase 6 link-plugin-graphs.ts) |
+| 2026-09-14 | 0 | F0-T4 | done | 4 archetypes: sticky-notes, mermaid-renderer, logging-hook, research-agent |
+| 2026-09-14 | 0 | F0-T5 | done | strategy §10 documents Fase 0 (12 lines added) |
+| 2026-09-14 | 1 | F1-T1 | done | sdk-shared: source.ts + manifest.ts (zod v4 strict, path-traversal guard); 16/16 tests pass |
+| 2026-09-14 | 1 | F1-T2 | done | workspace-scanner: `mergeLayered3` + `ThreeLayerSource`; 42/42 tests pass |
+| 2026-09-14 | 1 | F1-T3 | done | plugins/service.ts (3-layer scan, kind derivation, best-effort list) + host.ts (Fase 4 stub + singleton) |
+| 2026-09-14 | 1 | F1-T4 | done | plugins/route.ts mounted at `/api/plugins` + `/api/plugins/{id}`; openapi.json lists both; SDK schemas inlined |
+| 2026-09-14 | 1 | F1-T5 | done | backend/AGENTS.md +21 lines: `## Plugins Module` section |
+| 2026-09-14 | 1 | F1-GATE | done | 58/58 tests, 28 routes in /doc, no Zod duplication. Open items: workspaces scope (symlink fragility), PluginManifest named-ref, sample manifest format drift |
+| 2026-09-14 | 2 | F2-T1 | done | `@puna/sdk-frontend`: registry (list + parallel detail, `Promise.allSettled`), host provider + hooks, slots w/ error boundary, loader, source badge. Frontend mount + static loader for sticky-notes |
+| 2026-09-14 | 2 | F2-T2 | done | `<PluginSlot>` + `PluginErrorBoundary` (logs + fallback); per-slot strict boundary; `data-plugin-*` attrs |
+| 2026-09-14 | 2 | F2-T3 | done | `LeftDockWithPlugins` at `routes/u/route.tsx:124` — `[...DOCK_ITEMS, ...pluginLeftBar]` memoized |
+| 2026-09-14 | 2 | F2-T4 | done | `footer-bar.tsx` 3 regions (left/middle/right) wrapped in `PluginSlot`; `Plugins:` counter derives from `registry.plugins.size` |
+| 2026-09-14 | 2 | F2-T5 | done | sticky-notes sample rewritten to strict `PluginCapabilities` manifest; full UI (list/add/delete, localStorage) + footer counter; README updated |
+| 2026-09-14 | 2 | F2-T6 | done | `PluginSourceBadge` (green/blue/purple by source + kind suffix); dock `title="<name> · <source> · <kind>"` + source dot |
+| 2026-09-14 | 2 | CT-1  | done | `frontend/AGENTS.md` + `## Plugin Slots` section (registry contract, slot regions, error-boundary policy) |
+| 2026-09-14 | 2 | F2-GATE | done | 9/9 verify gates pass: typecheck x2, 58/58 tests, openapi 28 routes, manifest parse, frontend build, visual-check stub at `.docs/plugin-sdk-fase2-verify.md` |
+| 2026-09-14 | * | F0+F1+F2+WS-MIG | done | bundled commit — see `.docs/plugin-sdk.implementation-plan.progress.md` for per-fase detail |

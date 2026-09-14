@@ -122,3 +122,24 @@ Within a module, import in this order:
 5. Create `route.ts` with Hono routes
 6. Add model to `src/models/` if new table needed
 7. Register routes in `src/server.ts`
+
+## Plugins Module
+
+`src/modules/plugins/` is a deliberate deviation from the standard template:
+
+- **3-layer scan**: uses `mergeLayered3` (workspace-local + workspace-global +
+  system-global via `defaultSystemPluginDir()`), unlike the 2-layer
+  agents/skills/mcps which use `mergeLayered`. Local wins on collision.
+- **No `schema.ts`**: `route.ts` imports `PluginManifest`, `PluginSummary`,
+  `PluginSource`, and `PluginKind` from `@puna/sdk-shared` — the SDK package is
+  the single source of truth for frontend + backend. Only response envelopes
+  (`PluginsListResponse`, `PluginDetailResponse`) are declared inline.
+- **No `repository.ts`**: Fase 1 is filesystem-only (`plugin.json` marker); no
+  DB tables yet.
+- **`host.ts`** holds a module-level `pluginHost` singleton. It is a Fase 1
+  stub: `setLoaded`/`list`/`get` work, while `getLifecycleHooks`, `getTools`,
+  `getGraphs`, and `getSystemPromptTransformers` populate in Fase 4.
+- **`service.ts`** exports the `PluginService` class (no singleton export);
+  plugin identity is the manifest `id`, so `GET /plugins/:id` resolves by
+  manifest, not directory name.
+- Fase 1 is **list-only**: no hooks, registry, or ui-bundle routes.

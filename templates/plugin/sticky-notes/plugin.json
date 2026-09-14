@@ -1,0 +1,15 @@
+{
+  "$schema": "https://puna.dev/schemas/plugin.v1.json",
+  "id": "sticky-notes",
+  "name": "Sticky Notes",
+  "version": "0.1.0",
+  "description": "Persistent sticky notes anchored in the left bar; counter widget in the footer.",
+  "engines": { "puna": ">=0.1.0" },
+  "capabilities": {
+    "leftBar": { "entry": "./ui/index.tsx", "export": "StickyNotesEntry" },
+    "footerBar": { "entry": "./ui/index.tsx", "export": "StickyNotesCounter" }
+  },
+  "permissions": {
+    "fs": { "write": [".puna/notes/"] }
+  }
+}

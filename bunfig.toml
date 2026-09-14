@@ -1,0 +1,7 @@
+# Bun workspace configuration.
+# Pinned `linker = "isolated"` keeps each workspace member's deps in its own
+# `node_modules/` (bun's default since 1.2). Prevents hoisting collisions
+# between Vite 8 (frontend), Drizzle + libsql (backend), and the 5 SDK packages.
+# See oracle review 2026-09-14 for rationale.
+[install]
+linker = "isolated"

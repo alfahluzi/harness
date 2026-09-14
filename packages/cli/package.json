@@ -1,0 +1,38 @@
+{
+  "name": "@puna/cli",
+  "version": "0.1.0",
+  "description": "puna plugin CLI — create, dev, build, link. Scaffolds plugins from templates/plugin/.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "puna-plugin": "./bin/puna-plugin.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./create": "./src/create.ts",
+    "./dev": "./src/dev.ts",
+    "./build": "./src/build.ts"
+  },
+  "files": [
+    "src",
+    "bin"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet' && exit 0"
+  },
+  "dependencies": {
+    "@puna/sdk-shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "bun-types": "*"
+  },
+  "keywords": [
+    "puna",
+    "plugin-sdk",
+    "cli"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "research-agent",
+  "name": "Research Agent",
+  "version": "0.1.0",
+  "kind": "graph",
+  "description": "Custom LangGraph research subgraph contributed via Fase 6 manifest.graphs[].",
+  "entry": {
+    "backend": "./backend/index.ts"
+  },
+  "graphs": [
+    {
+      "name": "research",
+      "path": "./graphs/research.ts",
+      "alias": "researcher"
+    }
+  ],
+  "permissions": {
+    "net": ["https://*"]
+  },
+  "backend": {
+    "entry": "./backend/index.ts"
+  }
+}

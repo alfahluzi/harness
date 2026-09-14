@@ -122,6 +122,43 @@ export async function mergeLayered(
 	return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export type ThreeLayerSource = "workspace-local" | "workspace-global" | "system-global";
+
+export interface ThreeLayeredEntry {
+	name: string;
+	source: ThreeLayerSource;
+	dir: string;
+}
+
+export async function mergeLayered3(
+	workspaceLocalDir: string | null,
+	workspaceGlobalDir: string | null,
+	systemGlobalDir: string | null,
+	marker: string,
+): Promise<ThreeLayeredEntry[]> {
+	const localNames = await scanLayer(workspaceLocalDir, marker);
+	const globalNames = await scanLayer(workspaceGlobalDir, marker);
+	const systemNames = await scanLayer(systemGlobalDir, marker);
+
+	const merged = new Map<string, ThreeLayeredEntry>();
+	const apply = (dir: string | null, names: Set<string>, source: ThreeLayerSource) => {
+		if (!dir) return;
+		for (const name of names) {
+			merged.set(name, { name, source, dir: join(dir, name) });
+		}
+	};
+
+	apply(systemGlobalDir, systemNames, "system-global");
+	apply(workspaceGlobalDir, globalNames, "workspace-global");
+	apply(workspaceLocalDir, localNames, "workspace-local");
+
+	return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function defaultSystemPluginDir(): string {
+	return join(homedir(), ".config", "puna");
+}
+
 export function resolveSource(
 	localDir: string | null,
 	globalDir: string | null,

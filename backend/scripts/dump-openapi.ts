@@ -2,11 +2,11 @@
 // Does not start a network listener.
 //
 // Usage: bun run scripts/dump-openapi.ts [output-path]
-// Default output: ./openapi.json
+// Default output: <backend>/openapi.json (anchored to script dir, not CWD).
 
 import app from "../src/server";
 
-const outPath = process.argv[2] ?? "openapi.json";
+const outPath = process.argv[2] ?? new URL("../openapi.json", import.meta.url).pathname;
 
 const res = await app.fetch(new Request("http://x/doc"));
 if (!res.ok) {

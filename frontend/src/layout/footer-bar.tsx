@@ -1,11 +1,21 @@
 import { UserRound } from "lucide-react";
+import {
+	PluginSlot,
+	usePluginFooterBarItems,
+	usePluginRegistry,
+} from "@puna/sdk-frontend";
 import { useActiveWorkdir } from "../hooks/use-active-workdir";
 
 export function FooterBar() {
 	const { configDir } = useActiveWorkdir();
+	const registry = usePluginRegistry();
+	const footerLeft = usePluginFooterBarItems("left");
+	const footerMiddle = usePluginFooterBarItems("middle");
+	const footerRight = usePluginFooterBarItems("right");
 	return (
 		<footer className="col-span-3 row-start-3 flex h-8 items-center justify-between border-t mt-0.5 border-neutral-200 bg-neutral-50/80 px-4 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/80 dark:text-neutral-400">
 			<div className="w-fit flex gap-1 justify-start">
+				<PluginSlot slot="footerBar.left">{footerLeft}</PluginSlot>
 				<_FooterButton>
 					<div className="flex px-1 gap-1">
 						<UserRound size={14} />
@@ -20,15 +30,24 @@ export function FooterBar() {
 						</span>
 					</span>
 				</_FooterButton>
-				<_FooterButton>
-					<span className="mx-2">Plugins: 2</span>
+				<_FooterButton
+					title={
+						registry.error
+							? `Plugin registry error: ${registry.error.message}`
+							: `${registry.plugins.size} plugin(s) loaded`
+					}
+				>
+					<span className="mx-2">Plugins: {registry.plugins.size}</span>
 				</_FooterButton>
 				<_FooterButton>
 					<span className="mx-2">MCP: 2</span>
 				</_FooterButton>
 			</div>
-			<div className="w-fit flex gap-1 justify-between"></div>
+			<div className="w-fit flex gap-1 justify-between">
+				<PluginSlot slot="footerBar.middle">{footerMiddle}</PluginSlot>
+			</div>
 			<div className="w-fit flex gap-1 justify-end">
+				<PluginSlot slot="footerBar.right">{footerRight}</PluginSlot>
 				<_FooterButton>
 					<span className="mx-2">Total Token: 425692834</span>
 				</_FooterButton>

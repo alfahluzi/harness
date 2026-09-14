@@ -460,6 +460,18 @@ Karena
 
 Bertahap, tiap fase self-contained + shippable:
 
+### Fase 0 — Scaffolding (prerequisite, 0.5 hari)
+
+§10 assumes `packages/`, `agent/scripts/`, `templates/plugin/` exist. None do. Fase 0 ships them.
+
+- [ ] **F0-T1** root `package.json` add `"workspaces": ["packages/*"]`. Verify: `bun install` exits 0; `ls packages/` shows new dirs.
+- [ ] **F0-T2** scaffold `packages/{sdk-shared,sdk-frontend,sdk-backend,sdk-agent,cli}` each w/ per-pkg `package.json` (`@puna/sdk-*`, `type: "module"`, peer deps). Verify: `bun pm ls` lists 5 packages.
+- [ ] **F0-T3** scaffold `agent/scripts/`. Verify: `ls agent/scripts/` non-empty.
+- [ ] **F0-T4** scaffold `templates/plugin/{sticky-notes,mermaid-renderer,logging-hook,research-agent}` each w/ `plugin.json` + `ui/` + `backend/` + `README.md` stub. Verify: `find templates/plugin -name plugin.json | wc -l` = 4.
+- [ ] **F0-T5** document Fase 0 (this section). Verify: git diff shows new section.
+
+**Gate Fase 0 → Fase 1**: all 5 tasks verified.
+
 ### Fase 1 — Foundation (1–2 hari)
 - [ ] `packages/sdk-shared` + Zod `PluginManifest`
 - [ ] `backend/src/modules/plugins/` module (list-only, no load)

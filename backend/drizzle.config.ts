@@ -1,16 +1,18 @@
 import { defineConfig } from "drizzle-kit";
 import { resolve } from "node:path";
 
-// Shared with agent/ — see src/global/db.ts. Drizzle scripts run from
-// backend/ (see package.json db:*), so repo root is one level up.
+// Shared with agent/ — see src/global/db.ts. DB path is anchored to script
+// dir (backend/) so it stays correct regardless of CWD (root `bun install`
+// may invoke drizzle-kit from anywhere).
 export default defineConfig({
 	dialect: "sqlite",
 	schema: "./src/models/*.ts",
 	dbCredentials: {
 		url: resolve(
+			import.meta.dir,
 			process.env.SQLITE_PATH ??
 				process.env.BACKEND_DB_PATH ??
-				process.cwd() + "/../data/shared.db",
+				"../data/shared.db",
 		),
 	},
 });

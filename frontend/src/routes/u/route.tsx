@@ -1,14 +1,14 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { usePluginLeftBarItems } from "@puna/sdk-frontend";
 import { FooterBar } from "../../layout/footer-bar";
 import { HeaderBar } from "../../layout/header-bar";
 import { LeftBar, type NavigationLeftItem } from "../../layout/left-bar";
 import { MainPanel } from "../../layout/main-panel";
-import { NavigationPanel } from "../../layout/navigation-panel";
 import { McpNavPanel } from "./-components/mcp-nav-panel";
 import { AgentsNavPanel } from "./-components/agents-nav-panel";
 import { SkillsNavPanel } from "./-components/skills-nav-panel";
 import { ChatNavPanel } from "../../layout/chat-nav-panel";
-import { useRef, useState } from "react";
+import { useMemo } from "react";
 
 function ChatIcon({ className }: { className?: string }) {
 	return (
@@ -160,51 +160,33 @@ const DOCK_ITEMS: NavigationLeftItem[] = [
 	},
 ];
 
+/**
+ * Static dock items plus plugin-contributed `leftBar` entries.
+ * Plugin items are appended after the built-ins so core navigation stays fixed.
+ */
+function LeftDockWithPlugins() {
+	const pluginItems = usePluginLeftBarItems();
+	const dockItems = useMemo(
+		() => [...DOCK_ITEMS, ...pluginItems],
+		[pluginItems],
+	);
+	return <LeftBar items={dockItems} />;
+}
+
 export const Route = createFileRoute("/u")({
 	component: UsersLayout,
 });
 function UsersLayout() {
-	const [navWidth, setNavWidth] = useState(240);
-	const isResizingRef = useRef(false);
-
-	const handleResizeStart = (e: React.PointerEvent) => {
-		e.preventDefault();
-		isResizingRef.current = true;
-		document.body.style.cursor = "col-resize";
-		document.body.style.userSelect = "none";
-
-		const startX = e.clientX;
-		const startWidth = navWidth;
-
-		const handlePointerMove = (moveEvent: PointerEvent) => {
-			if (!isResizingRef.current) return;
-			const delta = startX - moveEvent.clientX;
-			setNavWidth(Math.min(Math.max(startWidth + delta, 180), 480));
-		};
-
-		const handlePointerUp = () => {
-			isResizingRef.current = false;
-			document.body.style.cursor = "";
-			document.body.style.userSelect = "";
-			document.removeEventListener("pointermove", handlePointerMove);
-			document.removeEventListener("pointerup", handlePointerUp);
-		};
-
-		document.addEventListener("pointermove", handlePointerMove);
-		document.addEventListener("pointerup", handlePointerUp);
-	};
 	return (
 		<div className="flex h-screen w-screen flex-col overflow-hidden bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
 			<HeaderBar />
 			<div className="flex flex-1 overflow-hidden">
-				<LeftBar items={DOCK_ITEMS} />
+				<LeftDockWithPlugins />
 				<MainPanel>
 					<Outlet />
 				</MainPanel>
-				{/* <NavigationPanel
-					onResizeLeftStart={handleResizeStart}
-					width={navWidth}
-				></NavigationPanel> */}
+				{/* Secondary NavigationPanel is disabled for now; the left bar
+				    renders the active item's panel inline. */}
 			</div>
 			<FooterBar />
 		</div>

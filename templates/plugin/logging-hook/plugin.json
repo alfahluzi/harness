@@ -1,0 +1,18 @@
+{
+  "id": "logging-hook",
+  "name": "Logging Hook",
+  "version": "0.1.0",
+  "kind": "agent-hook",
+  "description": "Logs beforeNode/afterNode invocations across all graph runs (Fase 5).",
+  "entry": {
+    "backend": "./backend/index.ts"
+  },
+  "hooks": [
+    "beforeNode",
+    "afterNode"
+  ],
+  "permissions": {},
+  "backend": {
+    "entry": "./backend/index.ts"
+  }
+}

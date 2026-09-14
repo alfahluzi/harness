@@ -1,0 +1,36 @@
+{
+  "name": "@puna/sdk-shared",
+  "version": "0.1.0",
+  "description": "Plugin SDK — shared Zod schemas, manifest types, source-layer enums.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts",
+    "./source": "./src/source.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
+  "peerDependencies": {
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "~6.0.2"
+  },
+  "keywords": [
+    "puna",
+    "plugin-sdk",
+    "zod"
+  ],
+  "license": "MIT"
+}

@@ -25,6 +25,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@langchain/langgraph-sdk": "^1.10.2",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@puna/sdk-shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.7",
     "zod": "^4.5.4"

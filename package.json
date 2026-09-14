@@ -6,6 +6,12 @@
   "bin": {
     "puna": "./bin/puna.mjs"
   },
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "packageManager": "bun@1.3.14",
   "engines": {
     "node": ">=18"
   },

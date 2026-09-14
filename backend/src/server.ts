@@ -13,6 +13,7 @@ import { skillRoutes } from "./modules/skills/route";
 import { mcpRoutes } from "./modules/mcps/route";
 import { workspaceRoutes } from "./modules/workspaces/route";
 import { providerRoutes } from "./modules/providers/route";
+import { pluginRoutes } from "./modules/plugins/route";
 
 const app = new OpenAPIHono();
 
@@ -101,6 +102,7 @@ app.route("/api", skillRoutes);
 app.route("/api", mcpRoutes);
 app.route("/api", workspaceRoutes);
 app.route("/api", providerRoutes);
+app.route("/api", pluginRoutes);
 
 // MCP Streamable HTTP surface for the same SessionService instance
 const mcpServer = buildMcpServer();
