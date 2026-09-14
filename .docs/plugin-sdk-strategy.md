@@ -92,12 +92,14 @@ System-wide: `~/.config/puna/plugins/<name>/` — same layout.
     "toolUi":        { "entry": "ui/index.js", "export": "toolUi" },
 
     "backendHooks":  { "entry": "backend/index.ts" },
-    "tools":         { "entry": "backend/index.ts", "export": "tools" },
+    "tools":         { "entry": "backend/index.ts", "export": "default.tools" },
     "graphs":        [
-      { "id": "notes-agent", "entry": "graphs/notes-agent.ts", "export": "graph" }
+      { "id": "notes-agent", "entry": "graphs/notes-agent.ts", "export": "graph", "namespace": "com.example.notes" }
     ]
+    // Adapter (§5.5): <namespace>/<id> → <entry>:<export> in agent/langgraph.json.
   },
 
+  // tools export references the default-export BackendPlugin's .tools method (see §5.3).
   "permissions": {
     "fs":  { "read": ["${workspace}/notes"] },
     "net": { "hosts": ["api.example.com"] }
@@ -135,6 +137,7 @@ Endpoint:
 | POST   | `/api/plugins/{id}/enable`      | Toggle in workspace conf      |
 | POST   | `/api/plugins/{id}/disable`     | ...                            |
 | GET    | `/api/plugins/registry`         | Merged capability index untuk frontend boot |
+| GET    | `/api/plugins/hooks?workspace=...` | RPC: hooks for agent sub-process (see §5.4) |
 
 ### 5.2 Host services (`backend/src/global/plugin-host.ts`)
 
@@ -153,8 +156,7 @@ export class PluginHost {
 ```
 
 `PluginHost` dipakai oleh:
-- `agent-runtime.ts` — untuk merge system prompt + register additional tools +
-  panggil `beforeNode`/`afterNode` hook.
+- `agent-runtime.ts` — merge system prompt via `PluginHost.getSystemPromptTransformers()` pipeline (replace `resolveSource` single-pick at L99); register additional tools via `buildRuntimeTools` patch; panggil `beforeNode`/`afterNode` hook.
 - `agent/src/base/graph.ts` — untuk optional pre/post node wrapper (lihat 5.4).
 - `agents` route (`/api/agents`) — untuk merge plugin-declared agent profiles.
 
@@ -200,7 +202,8 @@ export function withPluginHooks<N extends string>(
     const out = await fn(state, cfg);
     for (const h of hooks) {
       const patch = await h.afterNode?.(name, { ...state, ...out }, cfg);
-      if (patch) Object.assign(out, patch);
+      // Spread (not Object.assign) to preserve LangGraph reducer immutability semantics.
+      if (patch) return { ...out, ...patch };
     }
     return out;
   };
@@ -210,6 +213,24 @@ export function withPluginHooks<N extends string>(
 `fetchPluginHooks` = single HTTP round trip ke backend `/api/plugins/hooks?workspace=...`.
 Agent process itu **sub-process terpisah** (LangGraph server), jadi
 komunikasi via HTTP, bukan direct import.
+
+### 5.4.1 Tool flow (backend host → agent sub-process)
+
+`PluginHost.getTools()` lives di backend (satu proses dengan Hono).
+Agent sub-process (`agent/`, jalan via LangGraph server) **tidak** punya akses
+direct ke backend process. Pengiriman tool:
+
+1. Saat backend boot: `PluginHost.discoverAndLoad()` aggregate `StructuredTool[]`.
+2. Backend serializes tool descriptor (name + JSON schema input, **bukan** implementation)
+   ke file `.runtime/plugin-tools.json` di workspace.
+3. Agent sub-process baca file di boot, lalu register tool via existing
+   `agent/src/base/tools/index.ts` factory — implementation callable via
+   HTTP RPC ke backend `/api/plugins/{id}/invoke` (tool name → backend dispatch).
+4. Capability/permission check di backend host sebelum tool implementation jalan.
+
+Trade-off: extra HTTP hop per tool call. Acceptable karena tool freq rendah
+dibanding LLM tokens. Alternative (in-process shared memory) revisit jika
+latency terasa.
 
 ### 5.5 Custom LangGraph registration
 
@@ -283,7 +304,7 @@ export interface FooterBarContribution {
 export interface ChatRendererContribution {
   // Match predicate + replacement. Undefined = fallback to core.
   human?: (msg: ChatMessage) => React.ReactNode | undefined;
-  ai?:    (msg: ChatMessage, opts: { streaming?: boolean }) => React.ReactNode | undefined;
+  ai?:    (msg: ChatMessage, opts: { streaming?: boolean }) => React.ReactNode | undefined;  // adapter at chat-request.tsx:86-99
   tool?:  (msg: ChatMessage) => React.ReactNode | undefined;
 }
 
@@ -310,8 +331,8 @@ No structural change ke `LeftBar` itself; ia sudah generic.
 ```
 
 **Chat renderers** — ubah call sites di
-`frontend/src/routes/u/chat/-components/chat-panel.tsx` (tempat msg-*
-dipilih) supaya:
+`frontend/src/routes/u/chat/-components/chat-request.tsx` (L86-99, tempat msg-*
+ dipilih oleh role-based dispatch) supaya:
 
 ```tsx
 const custom = registry.chatRenderers?.human?.(msg);
@@ -328,9 +349,41 @@ return Custom ? <Custom msg={msg} args={msg.args} result={msg.result}/>
               : <DefaultToolBubble msg={msg}/>;
 ```
 
-Butuh minor extension pada `ChatMessage` type (add `toolName`, `args`, `result`).
+Butuh extension pada `ChatMessage` type (`chat-types.ts:24-29`) — add optional `toolName?`, `args?`, `result?`. **Schema decision**: tool call messages store structured args/result di dedicated fields, bukan di `content` (yang string). Lihat §6.5 schema migration.
 
-### 6.4 Bundle format
+### 6.5 ChatMessage schema migration
+
+`chat-types.ts` saat ini:
+```ts
+interface ChatMessage {
+  id: string;
+  role: "human" | "ai" | "tool";
+  content: string;
+  meta?: MessageMeta;
+  branch?: BranchInfo;
+}
+```
+
+Plugin-aware shape (Phase 3):
+```ts
+interface ChatMessage {
+  id: string;
+  role: "human" | "ai" | "tool";
+  content: string;          // legacy: human/ai text. Empty string for tool calls.
+  meta?: MessageMeta;
+  branch?: BranchInfo;
+  // Phase 3 additions (all optional, backward-compat)
+  toolName?: string;
+  args?: unknown;
+  result?: unknown;
+}
+```
+
+Rule: tool role messages MUST populate `toolName` + `args` + (`result` when
+completed). Human/ai messages leave new fields undefined. Renderer decision:
+`role === "tool"` → use `toolName/args/result` path; else fall back to `content`.
+
+### 6.6 Bundle format
 
 Plugin ship-nya:
 - **Dev mode**: `bun` transpile TS ke ESM di plugin dir on-demand, serve via
@@ -394,7 +447,12 @@ Karena
   `npm run openapi-ts` menghasilkan client function-nya.
 - Manifest schema (`PluginManifest`) di-export via
   `packages/sdk-shared` sekaligus dipakai di route Zod supaya client typed
-  end-to-end.
+  end-to-end. Concrete usage di `route.ts`:
+  ```ts
+  import { PluginManifest } from "@puna/sdk-shared";
+  // re-use Zod: route.openapi("...", { body: PluginManifest.openapi() });
+  ```
+  Single source of truth = sdk-shared; route.ts hanya re-export untuk OpenAPI metadata.
 
 ---
 
@@ -452,7 +510,7 @@ Total: ~1.5–2 minggu untuk MVP full-stack (single dev).
 - Marketplace / discovery UI (browse remote plugin catalog).
 - Cryptographic signature verification.
 - Cross-plugin dependency resolution.
-- Frontend plugin CSS scoping (rely on Tailwind + naming discipline).
+- Frontend plugin CSS scoping v1 — plugins share Tailwind utility classes globally. Risk: collision when 2 plugins use same class (Tailwind JIT dedup, bukan class-name smell). Acceptable v1 only if sample plugins stay narrow (≤3 utilities per element). Revisit v2 dengan CSS-modules @ slot boundary.
 - Plugin auto-update.
 
 ---
@@ -463,13 +521,13 @@ Total: ~1.5–2 minggu untuk MVP full-stack (single dev).
    di-enable, atau perlu isolate sub-process per plugin graph? → default
    restart; revisit ketika latency terasa.
 2. **Global vs local plugin conflicts**: overlay policy sudah jelas (local
-   wins). Perlu UI indicator di frontend? → tambah `source` di
-   `PluginSummary`, tampilkan badge.
+   wins). Perlu UI indicator di frontend? → tambah `source: "workspace-local" | "workspace-global" | "system-global"` di
+   `PluginSummary` Zod schema (declare §4 alongside `PluginManifest`).
+   Tampilkan badge di UI.
 3. **Backend hook execution model**: fire-and-forget vs blocking?
    → blocking dengan timeout 5s; kalau plugin lambat, drop hook + log.
 4. **Tool namespace collision**: dua plugin daftar tool `search`. Policy?
-   → auto-namespace ke `<pluginId>.search` di runtime; manifest opsional
-   `alias`.
+   → **host prepends** namespace: plugin returns tools dengan bare name (`search`); host renames ke `<pluginId>.search` saat register. Manifest opsional `alias` (`"alias": "search"`) untuk override. **Plugin author tidak tulis prefix** — biar host jadi single source of namespace truth. Update §5.3 contract doc accordingly (add note).
 
 ---
 
@@ -484,3 +542,4 @@ Reuse yang sudah battle-tested:
 - Tools factory + filter: [`tools/index.ts`](../agent/src/base/tools/index.ts)
 - Left bar contract: [`left-bar.tsx`](../frontend/src/layout/left-bar.tsx) — sudah
   generic (props-driven), tinggal inject via registry.
+- Footer bar slots: [`footer-bar.tsx`](../frontend/src/layout/footer-bar.tsx) — already 3-region (left/center/right), inject via §6.3 `<PluginSlot>` wrapper. Refactor minimal.
