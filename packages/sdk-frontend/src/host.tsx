@@ -67,8 +67,14 @@ type PluginHostContextValue = {
 	registry: RegistryState;
 	configDir: string;
 	loaders: Loaders;
-	components: Map<string, PluginComponentType>;
-	registerComponent: (key: string, component: PluginComponentType) => void;
+	/**
+	 * Resolved loader cache, keyed by `loaderKey`. Holds a single component for
+	 * component-shaped capabilities (`leftBar` / `footerBar` via
+	 * `LoadedPluginComponent`) and a raw module record for object-shaped
+	 * capabilities (`chatRenderers` / `toolUi` via `useResolvedModuleMap`).
+	 */
+	components: Map<string, unknown>;
+	registerComponent: (key: string, component: unknown) => void;
 };
 
 const defaultHostContext: PluginHostContextValue = {
@@ -103,9 +109,9 @@ export function PluginHostProvider({
 		[fetchImpl, baseUrl],
 	);
 	const [registry, setRegistry] = useState<RegistryState>(EMPTY_REGISTRY);
-	const [components, setComponents] = useState<
-		Map<string, PluginComponentType>
-	>(() => new Map());
+	const [components, setComponents] = useState<Map<string, unknown>>(
+		() => new Map(),
+	);
 
 	useEffect(() => {
 		if (!configDir) {
@@ -143,7 +149,7 @@ export function PluginHostProvider({
 	}, [client, configDir]);
 
 	const registerComponent = useCallback(
-		(key: string, component: PluginComponentType) => {
+		(key: string, component: unknown) => {
 			setComponents((prev) => {
 				if (prev.get(key) === component) return prev;
 				const next = new Map(prev);
@@ -191,7 +197,7 @@ export function LoadedPluginComponent({
 	const { registry, configDir, loaders, components, registerComponent } =
 		useContext(PluginHostContext);
 	const key = loaderKey(pluginId, capabilityKey, exportName);
-	const Component = components.get(key) ?? null;
+	const Component = (components.get(key) ?? null) as PluginComponentType | null;
 
 	useEffect(() => {
 		if (Component) return;
@@ -236,6 +242,242 @@ export function LoadedPluginComponent({
 			<Component pluginId={pluginId} configDir={configDir} />
 		</div>
 	);
+}
+
+// ---------------------------------------------------------------------------
+// Fase 3 — chat renderers + tool UI (strategy §6.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Structural subset of the host app's `ChatMessage`
+ * (`frontend/src/lib/chat-types.ts`). Declared in the SDK so plugin UI modules
+ * can type renderers without importing host internals; the host type is
+ * structurally assignable to this shape.
+ */
+export type PluginChatMessage = {
+	id?: string;
+	role: "human" | "ai" | "tool";
+	content: string;
+	model?: string;
+	ts?: string;
+	toolName?: string;
+	args?: unknown;
+	result?: unknown;
+};
+
+/**
+ * Strategy §6.2 alias: plugin authors can `import type { ChatMessage }` from
+ * the SDK instead of reaching into host-app internals. `PluginChatMessage` is
+ * the canonical local name; this keeps the documented signature readable.
+ */
+export type ChatMessage = PluginChatMessage;
+
+/**
+ * Per-role chat render overrides (strategy §6.2). A renderer returning
+ * `undefined` means "no opinion" and the core `msg-*` bubble falls back.
+ */
+export type ChatRendererContribution = {
+	human?: (msg: PluginChatMessage) => ReactNode | undefined;
+	ai?: (
+		msg: PluginChatMessage,
+		opts: { streaming?: boolean },
+	) => ReactNode | undefined;
+	tool?: (msg: PluginChatMessage) => ReactNode | undefined;
+};
+
+/**
+ * Winning `chatRenderers` contribution plus its owning plugin id, so the chat
+ * adapter can attribute `PluginErrorBoundary` failures to the right plugin.
+ */
+export type ResolvedChatRenderers = ChatRendererContribution & {
+	pluginId: string;
+};
+
+/** Props passed to every `toolUi[toolName]` component (strategy §6.2). */
+export type ToolUiComponentProps = {
+	msg: PluginChatMessage;
+	args?: unknown;
+	result?: unknown;
+};
+
+/** Tool-name → inline component map contributed by `capabilities.toolUi`. */
+export type ToolUiContribution = Record<
+	string,
+	ComponentType<ToolUiComponentProps>
+>;
+
+type ResolvedModuleRequest = {
+	pluginId: string;
+	capabilityKey: PluginCapabilityKey;
+	exportName?: string;
+};
+
+function moduleRequestKey(request: ResolvedModuleRequest): string {
+	return loaderKey(
+		request.pluginId,
+		request.capabilityKey,
+		request.exportName ?? "",
+	);
+}
+
+/**
+ * Read a named export off a module record. Unlike `LoadedPluginComponent`,
+ * object-shaped capabilities do NOT fall back to `default` when an export name
+ * is declared — the object itself is the named export.
+ */
+function pickNamedExport(
+	record: Record<string, unknown>,
+	exportName?: string,
+): unknown {
+	return exportName ? record[exportName] : record.default;
+}
+
+/**
+ * Batch resolver for plugin *module records* (not single components).
+ *
+ * `LoadedPluginComponent` can't be reused for `chatRenderers` / `toolUi`: those
+ * capabilities are objects on named exports, not a single component. Resolving
+ * is done as one batch (instead of a per-plugin hook) so hook order stays
+ * stable regardless of how many plugins registry hydration yields. Uncached
+ * modules are loaded lazily and stored in the shared component cache using the
+ * same `loaderKey` machinery.
+ *
+ * Internal helper backing `usePluginChatRenderers` / `usePluginToolUi`.
+ */
+function useResolvedModuleMap(
+	requests: readonly ResolvedModuleRequest[],
+): Map<string, Record<string, unknown>> {
+	const { loaders, components, registerComponent } =
+		useContext(PluginHostContext);
+
+	useEffect(() => {
+		let cancelled = false;
+		for (const request of requests) {
+			const key = moduleRequestKey(request);
+			if (components.has(key)) continue;
+			const loader = loaders.get(key);
+			if (!loader) continue;
+			void loader()
+				.then((mod) => {
+					if (cancelled) return;
+					registerComponent(key, mod as unknown as Record<string, unknown>);
+				})
+				.catch((cause: unknown) => {
+					console.warn(`[puna:plugins] loader "${key}" failed`, cause);
+				});
+		}
+		return () => {
+			cancelled = true;
+		};
+	}, [requests, loaders, components, registerComponent]);
+
+	return useMemo(() => {
+		const resolved = new Map<string, Record<string, unknown>>();
+		for (const request of requests) {
+			const key = moduleRequestKey(request);
+			const record = components.get(key);
+			if (record && typeof record === "object") {
+				resolved.set(key, record as Record<string, unknown>);
+			}
+		}
+		return resolved;
+	}, [requests, components]);
+}
+
+/**
+ * Selected chat renderer override, or `null` when no plugin declares the
+ * capability.
+ *
+ * Precedence: `registry.plugins` insertion order — the first registered plugin
+ * declaring `capabilities.chatRenderers` wins. Its per-role renderer returning
+ * `undefined` falls back to the core bubble (a lower-priority plugin is not
+ * consulted, keeping plugin attribution unambiguous for the error boundary).
+ */
+export function usePluginChatRenderers(): ResolvedChatRenderers | null {
+	const { registry } = useContext(PluginHostContext);
+	const requests = useMemo<ResolvedModuleRequest[]>(() => {
+		const list: ResolvedModuleRequest[] = [];
+		for (const [pluginId, entry] of registry.plugins) {
+			const capability = entry.capabilities.chatRenderers;
+			if (!capability) continue;
+			list.push({
+				pluginId,
+				capabilityKey: "chatRenderers",
+				exportName: capability.export,
+			});
+		}
+		return list;
+	}, [registry.plugins]);
+	const modules = useResolvedModuleMap(requests);
+
+	return useMemo(() => {
+		for (const request of requests) {
+			const record = modules.get(moduleRequestKey(request));
+			if (!record) continue;
+			const contribution = pickNamedExport(record, request.exportName);
+			if (!contribution || typeof contribution !== "object") continue;
+			return {
+				...(contribution as ChatRendererContribution),
+				pluginId: request.pluginId,
+			};
+		}
+		return null;
+	}, [requests, modules]);
+}
+
+/** Component → owning plugin id, for boundary attribution in `msg-tool.tsx`. */
+const toolUiOwners = new WeakMap<object, string>();
+
+/**
+ * Component contributed for `toolName` via `capabilities.toolUi`, or `null`
+ * when no plugin handles it (legacy tool messages keep the default bubble).
+ *
+ * Precedence: `registry.plugins` insertion order — the first registered plugin
+ * exporting a component for the tool name wins.
+ */
+export function usePluginToolUi(
+	toolName: string | undefined,
+): ComponentType<ToolUiComponentProps> | null {
+	const { registry } = useContext(PluginHostContext);
+	const requests = useMemo<ResolvedModuleRequest[]>(() => {
+		const list: ResolvedModuleRequest[] = [];
+		for (const [pluginId, entry] of registry.plugins) {
+			const capability = entry.capabilities.toolUi;
+			if (!capability) continue;
+			list.push({
+				pluginId,
+				capabilityKey: "toolUi",
+				exportName: capability.export,
+			});
+		}
+		return list;
+	}, [registry.plugins]);
+	const modules = useResolvedModuleMap(requests);
+
+	return useMemo(() => {
+		if (!toolName) return null;
+		for (const request of requests) {
+			const record = modules.get(moduleRequestKey(request));
+			if (!record) continue;
+			const contribution = pickNamedExport(record, request.exportName);
+			if (!contribution || typeof contribution !== "object") continue;
+			const Component = (contribution as ToolUiContribution)[toolName];
+			if (typeof Component === "function") {
+				toolUiOwners.set(Component, request.pluginId);
+				return Component;
+			}
+		}
+		return null;
+	}, [requests, modules, toolName]);
+}
+
+/**
+ * Owning plugin id of a component returned by `usePluginToolUi`, so the tool
+ * bubble can attribute its `PluginErrorBoundary` log line.
+ */
+export function getPluginToolUiOwner(component: unknown): string | null {
+	if (typeof component !== "function") return null;
+	return toolUiOwners.get(component) ?? null;
 }
 
 /** Default icon used for plugin dock entries (no plugin-supplied icons yet). */

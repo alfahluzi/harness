@@ -1,21 +1,13 @@
 {
-  "id": "mermaid-renderer",
-  "name": "Mermaid Renderer",
-  "version": "0.1.0",
-  "kind": "ui",
-  "description": "Custom toolUi renderer for tool calls named `mermaid` (Fase 3).",
-  "entry": {
-    "ui": "./ui/index.tsx",
-    "backend": "./backend/index.ts"
-  },
-  "slots": [
-    "toolUi:mermaid"
-  ],
-  "permissions": {},
-  "ui": {
-    "bundle": "./ui/index.tsx"
-  },
-  "backend": {
-    "entry": "./backend/index.ts"
-  }
+	"$schema": "https://puna.dev/schemas/plugin.v1.json",
+	"id": "mermaid-renderer",
+	"name": "Mermaid Renderer",
+	"version": "0.1.0",
+	"description": "Custom toolUi renderer for tool calls named `mermaid`. Renders the raw Mermaid source with copy-to-clipboard and a syntax-highlighted preview block.",
+	"author": "Puna",
+	"license": "MIT",
+	"engines": { "puna": ">=0.1.0" },
+	"capabilities": {
+		"toolUi": { "entry": "ui/index.tsx", "export": "toolUi" }
+	}
 }

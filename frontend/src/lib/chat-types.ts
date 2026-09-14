@@ -25,6 +25,12 @@ export type ChatMessage = {
 	id?: string;
 	role: MessageRole;
 	content: string;
+	// Fase 3 additions (strategy §6.5), all optional for backward compat:
+	// tool-call messages carry structured data in dedicated fields instead of
+	// encoding it into `content` (which stays an empty string for tool calls).
+	toolName?: string;
+	args?: unknown;
+	result?: unknown;
 } & MessageMeta &
 	BranchInfo;
 

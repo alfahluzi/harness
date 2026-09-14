@@ -1,3 +1,4 @@
+import { PluginErrorBoundary, usePluginChatRenderers } from "@puna/sdk-frontend";
 import type { ChatMessage, TokenUsage } from "@/lib/chat-types";
 import { MessageAi } from "./msg-ai";
 import { MessageHuman } from "./msg-human";
@@ -73,6 +74,10 @@ export function ChatRequest({
 }: ChatRequestProps) {
 	const firstAiModel = messages.find((m) => m.role === "ai" && m.model)?.model;
 	const usage = sumUsage(messages);
+	// F3-T2: plugin chat-renderer overrides. Precedence lives in
+	// `usePluginChatRenderers` (first registered plugin declaring
+	// `chatRenderers`); per-role `undefined` falls back to the core bubble.
+	const chatRenderers = usePluginChatRenderers();
 
 	return (
 		<div
@@ -83,7 +88,20 @@ export function ChatRequest({
 		>
 			<div className="group w-full h-fit">
 				{messages.map((msg, index) => {
-					if (msg.role === "human")
+					if (msg.role === "human") {
+						if (chatRenderers) {
+							const custom = chatRenderers.human?.(msg);
+							if (custom !== undefined)
+								return (
+									<PluginErrorBoundary
+										key={index}
+										pluginId={chatRenderers.pluginId}
+										capabilityName="chatRenderers"
+									>
+										{custom}
+									</PluginErrorBoundary>
+								);
+						}
 						return (
 							<MessageHuman
 								key={index}
@@ -93,8 +111,30 @@ export function ChatRequest({
 								onSwitchBranch={onSwitchBranch}
 							/>
 						);
-					if (msg.role === "ai")
+					}
+					if (msg.role === "ai") {
+						if (chatRenderers) {
+							// The live tail is rendered by the separate
+							// `<MessageAi streaming>` overlay appended after this
+							// map, so mapped ai messages are never streaming.
+							const custom = chatRenderers.ai?.(msg, {
+								streaming: false,
+							});
+							if (custom !== undefined)
+								return (
+									<PluginErrorBoundary
+										key={index}
+										pluginId={chatRenderers.pluginId}
+										capabilityName="chatRenderers"
+									>
+										{custom}
+									</PluginErrorBoundary>
+								);
+						}
 						return <MessageAi key={index} content={msg.content} />;
+					}
+					// Tool role passes through: `MessageTool` performs its own
+					// `toolUi` lookup (F3-T4).
 					return <MessageTool key={index} msg={msg} />;
 				})}
 				{last && isStreaming && <MessageAi content={streamContent} streaming />}

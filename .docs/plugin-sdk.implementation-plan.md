@@ -246,3 +246,11 @@ Per-Fase checklist (must pass before next Fase opens):
 | 2026-09-14 | 2 | CT-1  | done | `frontend/AGENTS.md` + `## Plugin Slots` section (registry contract, slot regions, error-boundary policy) |
 | 2026-09-14 | 2 | F2-GATE | done | 9/9 verify gates pass: typecheck x2, 58/58 tests, openapi 28 routes, manifest parse, frontend build, visual-check stub at `.docs/plugin-sdk-fase2-verify.md` |
 | 2026-09-14 | * | F0+F1+F2+WS-MIG | done | bundled commit — see `.docs/plugin-sdk.implementation-plan.progress.md` for per-fase detail |
+| 2026-09-14 | 3 | F3-T1 | done | `frontend/src/lib/chat-types.ts` adds `toolName?/args?/result?` to `ChatMessage` (all optional, backward-compat) |
+| 2026-09-14 | 3 | F3-T2 | done | `chat-request.tsx` role dispatch consults `usePluginChatRenderers()` for human/ai before core bubbles; wrapped in `PluginErrorBoundary` |
+| 2026-09-14 | 3 | F3-T3 | done | `@puna/sdk-frontend`: `usePluginChatRenderers()` + types `PluginChatMessage`/`ChatMessage`/`ChatRendererContribution`/`ResolvedChatRenderers`; `useResolvedModuleMap` internal batch resolver |
+| 2026-09-14 | 3 | F3-T4 | done | `msg-tool.tsx` `usePluginToolUi(msg.toolName)` custom path + `data-plugin-tool`; `getPluginToolUiOwner` WeakMap attribution; static loader entry for `mermaid-renderer::toolUi::toolUi` |
+| 2026-09-14 | 3 | F3-T5 | done | `templates/plugin/mermaid-renderer/*` rewritten to strict `PluginManifest`; `toolUi` object with `mermaid: MermaidDiagram` component (raw source + copy button, no mermaid runtime) |
+| 2026-09-14 | 3 | F3-T6 | done | `backend/src/modules/plugins/route.ts` `GET /api/plugins/{id}/ui-bundle` with `Bun.build` (browser ESM, react/router external); 200/400/404/500; module-level cache; openapi.json 29 routes |
+| 2026-09-14 | 3 | F3-T7 | done | `packages/sdk-frontend/src/slots.tsx` F3-T7 doc comment added; per-slot `PluginErrorBoundary` verified already correct (Fase 2 baseline) |
+| 2026-09-14 | 3 | F3-GATE | done | 7/7 tasks; verify matrix all green: 58/58 tests, SDK + backend typecheck pass, frontend build OK (2942 modules, mermaid + toolUi tokens in bundle), openapi.json has 3 plugin routes, mermaid manifest parses strict, curl tests for ui-bundle (happy + 4 error paths + cache hit) |

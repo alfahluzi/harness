@@ -11,6 +11,17 @@ export * from "./slots";
 export * from "./badge";
 export * from "./host";
 
+// Fase 3 chat/tool UI surface (also covered by `export * from "./host"`;
+// listed explicitly for SDK discoverability).
+export type {
+	ChatMessage,
+	ChatRendererContribution,
+	PluginChatMessage,
+	ResolvedChatRenderers,
+	ToolUiComponentProps,
+	ToolUiContribution,
+} from "./host";
+
 // Re-exported so consumers type plugin data without a second dependency import.
 export {
 	PluginCapabilities,

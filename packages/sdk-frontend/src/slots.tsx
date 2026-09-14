@@ -3,6 +3,12 @@
  *
  * A plugin component that throws must not take down the host app: the boundary
  * logs to the console and renders `fallback ?? null`.
+ *
+ * F3-T7 (React strict boundary per slot): this is the design intent for every
+ * plugin-rendered surface — left bar, footer, `chatRenderers` and `toolUi`
+ * alike. New surfaces must wrap plugin output in `PluginErrorBoundary` (or
+ * `PluginSlot`) so a single bad plugin degrades to null instead of a white
+ * screen. The chat adapter and tool bubble follow this in Fase 3.
  */
 import { Component, type ErrorInfo, type ReactNode } from "react";
 

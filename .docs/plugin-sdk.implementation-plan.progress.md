@@ -248,6 +248,75 @@ Selected approach **A** (unified workspace) over B (symlink doc) and C (hybrid) 
 - **Open Items from Fase 1 still apply (workspace resolution was Item #1):**
   - **Item #2 (named OpenAPI refs)** → RESOLVED as side-effect of migration. `PluginManifest` now in `components.schemas`.
   - **Item #3 (`mergeLayered3` vs `mergeLayered` 2-layer vocabularies)** — open. Defer to first Fase that introduces a 4th layer.
-  - **Item #4 (sample manifest format drift)** — open. Templates use `kind`/`entry`/`slots`/`hooks`; strategy §4 uses `capabilities`/`engines`/`permissions`. Resolve when Fase 7 CLI regenerates templates.
-  - **Item #5 (per-pkg `tsconfig.json`)** — open. Tracked; first consumer is Fase 2 sdk-frontend.
-  - **Item #6 (`bun install` from cwd of subdir)** — RESOLVED. `bun install` from anywhere now uses root lockfile + root node_modules; no more "workspace dependency not found" error.
+   - **Item #4 (sample manifest format drift)** — PARTIALLY RESOLVED in Fase 3 (mermaid-renderer rewritten). Remaining: `templates/plugin/{logging-hook,research-agent}/plugin.json` still use legacy `kind`/`entry`/`slots`/`hooks` shape. Will FAIL strict `PluginManifest.parse` until rewritten. Tracked to Fase 5 (logging-hook) + Fase 6 (research-agent).
+   - **Item #5 (per-pkg `tsconfig.json`)** — RESOLVED in Fase 2. `packages/sdk-{shared,frontend}/tsconfig.json` exist; `bun --cwd packages/sdk-{frontend,shared} typecheck` exits 0.
+   - **Item #6 (`bun install` from cwd of subdir)** — RESOLVED. `bun install` from anywhere now uses root lockfile + root node_modules; no more "workspace dependency not found" error.
+
+---
+
+## Fase 3 — Chat renderers + tool UI + schema migration — DONE
+
+**Status:** implemented + verified (all 7 tasks).
+**Lane:** 3 parallel `@fixer` background tasks (fix-1 frontend, fix-2 backend, fix-3 sample) → orchestrator reconcile + verify.
+**Scope:** ChatMessage schema migration, chat-renderer + toolUi SDK hooks, role-dispatch adapter, msg-tool custom path, mermaid-renderer sample rewrite, `GET /api/plugins/{id}/ui-bundle` endpoint with `Bun.build`.
+
+### Changes
+
+| File | Status | Purpose |
+|---|---|---|
+| `frontend/src/lib/chat-types.ts` | MOD | `ChatMessage` gains `toolName?: string`, `args?: unknown`, `result?: unknown` (all optional, backward-compat). |
+| `packages/sdk-frontend/src/host.tsx` | MOD | New types `PluginChatMessage` / `ChatMessage` (alias) / `ChatRendererContribution` / `ResolvedChatRenderers` / `ToolUiComponentProps` / `ToolUiContribution`. New hooks `usePluginChatRenderers()` + `usePluginToolUi(toolName)` + `getPluginToolUiOwner(component)` (WeakMap attribution). Internal `useResolvedModuleMap` batch resolution (avoids Rules-of-Hooks violation in registry loop). Component cache widened `Map<string, PluginComponentType>` → `Map<string, unknown>`. |
+| `packages/sdk-frontend/src/index.ts` | MOD | Explicit re-exports for F3 surface types. |
+| `packages/sdk-frontend/src/slots.tsx` | MOD | Doc-comment only (F3-T7 design-intent note on `PluginErrorBoundary`). Behavior unchanged — already correct from Fase 2. |
+| `frontend/src/lib/plugins/loader.ts` | MOD | Added `loaderKey("mermaid-renderer", "toolUi", "toolUi")` static entry importing `templates/plugin/mermaid-renderer/ui/index.tsx`. Map constructor explicit-typed `new Map<string, PluginLoader>` for mixed entry types. |
+| `frontend/src/routes/u/chat/-components/chat-request.tsx` | MOD | Role dispatch consults `usePluginChatRenderers()` for human/ai before core bubbles; custom output wrapped in `PluginErrorBoundary pluginId capabilityName="chatRenderers"`; ai role called with `{ streaming: false }` (post-map stream overlay preserved). Tool role delegates to MessageTool. |
+| `frontend/src/routes/u/chat/-components/msg-tool.tsx` | MOD | `usePluginToolUi(msg.toolName)` custom path with `data-plugin-tool` wrapper + `PluginErrorBoundary`. Default mono bubble unchanged for legacy/no-match messages. Owner attribution via `getPluginToolUiOwner` WeakMap. |
+| `backend/src/modules/plugins/route.ts` | MOD | + `uiBundleRoute` (OpenAPI `/plugins/:id/ui-bundle`), `uiBundleCache` Map (process-lifetime), `pickUiCapability` helper (priority `chatRenderers → toolUi → leftBar → footerBar`). `Bun.build({target:"browser",format:"esm",external:[react,react-dom,react/jsx-runtime,react-dom/client,@tanstack/react-router],minify:false,sourcemap:"none"})` for `.ts/.tsx`; `Bun.file` for `.js/.mjs`. Responses: 200 text/javascript, 400 InvalidWorkspace, 404 PluginNotFound, 500 entry-missing/build-failure/no-UI-capability/unsupported-ext. `console.error` full build result on failure. |
+| `backend/openapi.json` | REGEN | 29 routes (was 28); new path `/api/plugins/{id}/ui-bundle`. Gitignored. |
+| `templates/plugin/mermaid-renderer/plugin.json` | MOD | Rewritten to strict `PluginManifest`: `$schema`, `id:"mermaid-renderer"`, `author`, `license`, `engines.puna:">=0.1.0"`, `capabilities.toolUi = { entry: "ui/index.tsx", export: "toolUi" }`. Legacy `kind`/`entry`/`slots`/`ui`/`backend` removed. No permissions, no other capabilities. |
+| `templates/plugin/mermaid-renderer/ui/index.tsx` | MOD | Named export `toolUi` object with `mermaid: MermaidDiagram` component. Reads `args.source ?? args.code ?? args.diagram`. Clipboard copy w/ transient "Copied" state. `data-plugin-tool="mermaid"` wrapper. Optional result block. NO mermaid runtime (raw source + copy only). Inline `ChatMessage`/`ToolUiComponentProps` types (Lane A exports didn't exist at write time — see open items). |
+| `templates/plugin/mermaid-renderer/backend/index.ts` | MOD | Stub replaced with `export default {};` + comment (UI-only sample, no backend hooks). |
+| `templates/plugin/mermaid-renderer/README.md` | MOD | Full doc — What/Activation/Manifest/Capability notes/Limitations/Backend/Files. Notes loader key `mermaid-renderer::toolUi::toolUi`. Documents raw-source-only limitation. |
+
+### Verify matrix (re-run)
+
+- **[F3-T1]** `bun test packages/sdk-shared/src/manifest.test.ts` → 16/16 pass (no schema regression; `ChatMessage` lives in frontend, not SDK-shared).
+- **[F3-T1 typecheck]** `bun --cwd packages/sdk-shared typecheck` → exit 0; `bun --cwd packages/sdk-frontend typecheck` → exit 0.
+- **[F3-T1 grep]** `grep -E "toolName|args|result" frontend/src/lib/chat-types.ts` → 3 hits on `ChatMessage` extension.
+- **[F3-T2/3/4/7 build]** `cd frontend && npm run build` → exit 0; 2942 modules transformed; bundle tokens: `data-plugin-tool:"mermaid"` in main chunk, `chatRenderers` ×2 + `toolUi:` ×1 in chat chunk.
+- **[F3-T6 typecheck]** `./backend/node_modules/.bin/tsc --noEmit -p backend/tsconfig.json` → exit 0 (`typecheck` script not wired in `backend/package.json` — fallback used).
+- **[F3-T6 openapi]** `cd backend && bun run openapi:dump` → `wrote ... openapi.json (29 routes)`. `grep -E "^\s*\"(/api/plugins)" openapi.json | sort -u` → 3 paths: `/api/plugins`, `/api/plugins/{id}`, `/api/plugins/{id}/ui-bundle`.
+- **[F3-T6 curl]** happy path (`f3-bundle-test` fixture) → 200, `Content-Type: text/javascript; charset=utf-8`, body contains `chatRenderers`. Edge cases (all from Lane B verify): 404 `ghost` plugin, 400 invalid configDir, 500 no-UI-capability, 500 missing entry, 500 invalid-TSX (`Bun.build` failure with console.error full result), 200 `.js` as-is, 200 `leftBar` fallback. Cache byte-identical on repeat; warm ~13x faster than cold.
+- **[F3-T5 manifest parse]** `bun --print 'PluginManifest.parse(JSON.parse(readFileSync("./templates/plugin/mermaid-renderer/plugin.json"))).capabilities'` → `{"toolUi":{"entry":"ui/index.tsx","export":"toolUi"}}`.
+- **[F3-T5 bundle]** `bun --print '(await Bun.build({entrypoints:["./templates/plugin/mermaid-renderer/ui/index.tsx"],target:"browser",format:"esm",external:["react","react-dom"]})).success'` → `{"ok":true}`.
+- **[F3-T5 loader key alignment]** `grep "mermaid-renderer" frontend/src/lib/plugins/loader.ts` → entry present, `loaderKey("mermaid-renderer", "toolUi", "toolUi")`.
+- **[Regression]** `bun test packages/sdk-shared/src/manifest.test.ts backend/src/global/workspace-scanner.test.ts` → **58/58 pass**, 86 expect() calls.
+- **[Diff scope]** `git status --short` → 12 modified files, all in-scope (backend plugins route + 3 frontend SDK/chat files + 1 frontend loader + 4 template files). No accidental edits.
+
+**Gate Fase 3 → Fase 4: PASS** (per plan §5: "sample plugins visible in chat without backend reload" ✓ — static loader + chat-renderer dispatch + toolUi custom path all wired; mermaid-renderer sample strict + bundled + parsed; ui-bundle endpoint available as future hot-reload path).
+
+### Deviations from plan
+
+1. **Lane C used inline `ChatMessage` + `ToolUiComponentProps` types** instead of `import type` from `@puna/sdk-frontend`. Lane A hadn't landed its exports when Lane C wrote the template; runtime contract identical (types erased, structural match). Now resolvable in a one-line swap — tracked as open item.
+2. **`usePluginChatRenderers()` returns `{...contribution, pluginId}` not bare contribution** — Lane A added `pluginId` for `PluginErrorBoundary` attribution. Adapter caller still typechecks (`chatRenderers.human?.(msg)` ignores the extra field).
+3. **First-declaring plugin wins for chatRenderers; lower-priority plugins NOT consulted** — Lane A's design rationale: keeps `PluginErrorBoundary` pluginId attribution unambiguous. For ≤1 declaring plugin (current reality) behavior identical to "first non-undefined across all plugins".
+4. **`usePluginToolUi` returns bare component; pluginId via WeakMap `getPluginToolUiOwner`** — Lane A chose WeakMap to keep the hook signature exactly as spec'd (returns just the component, no attribution baggage). Adapter looks up owner at render time.
+5. **`useResolvedModuleMap` (batch) instead of per-plugin `useResolvedModule`** — calling a per-plugin hook inside a registry iteration would violate Rules of Hooks when plugins hydrate. Batch resolves the full map in one hook call.
+6. **ai role inside dispatch gets `{streaming: false}`** — post-map stream overlay at L100 of `chat-request.tsx` is preserved exactly; ai role inside map is non-streaming. Matches pre-SDK behavior.
+7. **Lane B added explicit unsupported-extension branch** → 500 `ui bundle build failed: unsupported entry extension: <rel>` (covers `.mts/.cts/.jsx`); plan spec only defined `.ts/.tsx/.js/.mjs`.
+8. **Lane B cache invalidation** — process-lifetime only (Map<string,string>); dev edits need backend restart. Documented inline. Watcher-based invalidation deferred.
+9. **No automated test for `/api/plugins/{id}/ui-bundle`** — plugins module has no test file yet (Fase 1 deviation: no `repository.ts`, no test infra). Verification was curl/fixture-driven. Open item: add bun:test coverage in a follow-up.
+10. **Plugin callback throws escape boundary** — `chatRenderers.human?.(msg)` runs OUTSIDE the `PluginErrorBoundary`; synchronous throw in callback code (not in rendered JSX) bypasses the boundary. Boundary catches render errors only. Matches spec snippet; flagging for F3-T7 hardening if strict crash-proofing of callbacks required.
+
+### Open items (from Fase 3)
+
+- **`ChatMessage` / `ToolUiComponentProps` import swap in `templates/plugin/mermaid-renderer/ui/index.tsx`** — Lane A now exports both from `@puna/sdk-frontend`. One-line change replacing inline types with `import type { ChatMessage, ToolUiComponentProps } from "@puna/sdk-frontend"`. Cosmetic; no behavior change.
+- **Auto-generated client regen after Lane B** — `frontend/src/lib/api/**` NOT regenerated (Lane A skipped per scope; Lane B didn't touch frontend). New `/api/plugins/{id}/ui-bundle` endpoint has no frontend consumer yet — regen deferred to first consumer Fase (likely Fase 4 backend-hooks or follow-up).
+- **`templates/plugin/{logging-hook,research-agent}/plugin.json`** — still legacy shape (kind/entry/slots/hooks). Will FAIL strict `PluginManifest.parse`. Rewrite in Fase 5 (logging-hook) + Fase 6 (research-agent).
+- **Backend plugins module test infra** — no bun:test coverage yet. F3-T6 verification was curl-driven. Add unit tests for `pickUiCapability` + bundle cache as follow-up.
+- **`mergeLayered3` 2-layer vs 3-layer vocabularies** — still open from Fase 1. Defer to first Fase that introduces a 4th layer.
+- **Workspace migration open items still open**:
+  - **Live dev-server smoke test** — deferred; verify on first Fase 4 dev-server invocation.
+  - **`packages/sdk-agent` zod peer dep** — still zero; revisit when Fase 5 wires `withPluginHooks`.
+  - **Vite prebundle of linked TS SDK packages** — Fase 2 typecheck + build passed; `optimizeDeps.exclude` not needed yet.
+  - **Root `bun.lock` gitignore/track policy** — still deferred to user. Recommend: track.

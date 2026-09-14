@@ -1,4 +1,3 @@
-// Fase 3: server-side stub. No backend logic needed.
-export default function MermaidRendererBackend() {
-  return {};
-}
+// mermaid-renderer has no backend hooks or tools — UI-only sample.
+// Kept for symmetry with other archetypes; `capabilities.backendHooks` is not declared.
+export default {};
