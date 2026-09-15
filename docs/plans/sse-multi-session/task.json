@@ -1,0 +1,172 @@
+{
+  "created_at": "2026-09-15T16:03:30.212Z",
+  "updated_at": "2026-09-15T16:03:42.627Z",
+  "phases": [
+    {
+      "id": 1,
+      "goal": "Fase 1 — Backend (independen)",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "stream-bus.ts: StreamBus + ConnectionMux (seq per-run, bounded queue drop-oldest, heartbeat 15s, workspace filter)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:40.529Z",
+              "note": "stream-bus.ts NEW (143 L): StreamBus singleton (EventEmitter + per-run seq Map), ConnectionMux bounded FIFO cap 1000 drop-oldest, heartbeat ': keepalive' 15s, workspace filter via injectable resolver (audit #5/#6/#7)"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "service.ts refactor: startRun/consumeRunToBus/cancelRun + mutex per-thread + persist-before-done + terminal envelope",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:40.746Z",
+              "note": "service.ts REFACTOR (534 L): withThreadLock per-childThreadId mutex (audit #3), startRun detached consumeRunToBus(...).catch() (audit #2), cancel-vs-error classification + envelope terminal selalu ada (audit #9), repo.setResult DULU baru publish done (audit #4), cancelRun best-effort; streamMessage/streamRun dihapus"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "route.ts refactor: POST /sessions/:id/stream -> 202 JSON, GET /sessions/stream firehose, POST /sessions/:id/cancel",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:40.983Z",
+              "note": "route.ts REFACTOR (374 L): POST /sessions/:id/stream -> 202 JSON (no SSE body), POST /sessions/:id/cancel NEW, GET /sessions/stream firehose plain Hono (registered before /sessions/:id); setStreamBusWorkspaceResolver di-wire di server.ts"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "schema.ts: CancelSessionInput + workspaceId query param",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:41.193Z",
+              "note": "schema.ts: CancelSessionInput alias. openapi.json: POST stream -> 202 (no text/event-stream), cancel terdaftar; GET /sessions/stream absen dari spec (plain Hono, intentional per plan 1c)"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "verifikasi: test integrasi firehose 2 koneksi x 2 POST + cancel, tsc, bun test, openapi regen",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:41.407Z",
+              "note": "Verifikasi: bunx tsc --noEmit 0 error; bun test src/modules/sessions/ 8 pass/0 fail; full backend 98 pass/1 pre-existing fail (agent-runtime.test.ts, unrelated); runtime smoke firehose 200 text/event-stream + unknown-id 404; openapi:dump + regen frontend client; test integrasi 8 cases (bus+mux+startRun, 438 L)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "goal": "Fase 2 — Frontend (kontrak Fase 1 fixed)",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "chat-types.ts: StreamEvent envelope (hand-shared)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:41.624Z",
+              "note": "chat-types.ts: StreamEvent envelope (sessionId/runId/seq/type/data/ts) hand-shared; drift-check vs backend/src/global/stream-bus.ts -> field-for-field identik (audit #10)"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "stream.ts refactor: startRun/cancelRun/connectStream",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:41.846Z",
+              "note": "stream.ts REFACTOR: streamChatMessage dihapus; startRun (POST -> 202 {runId}), cancelRun (POST cancel), connectStream (GET firehose -> onEvent(StreamEvent)); grep streamChatMessage 0 match"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "chat-session-store.ts: per-session state + per-(runId,seq) dedup + content-dedup backfill",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:42.068Z",
+              "note": "chat-session-store.ts NEW (249 L) Zustand v5: applyEvent dedup per-(runId,seq) + same-run ai-merge, applyHistory konten-dedup backfill-vs-live (prefix-drop + re-append live tail, audit #8), appendHuman optimistic-dedup, sessionTracker ref-count + useSessionSubscription (audit #12). Deviasi: lastRunId ditambah agar run berurutan tidak merge; applyEvent set status streaming saat messages"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "stream-provider.tsx + mount di __root.tsx (backoff 1s->30s + jitter, lazy connect)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:42.292Z",
+              "note": "stream-provider.tsx NEW (131 L): 1 firehose app-lifetime, useSyncExternalStore(sessionTracker.count), backoff exp 1s->30s + jitter +/-20% (audit #11), 5s idle-close saat ref-count 0 (lazy connect audit #12); mount di __root.tsx; dep zustand ^5.0.15 ditambah. AbortController hanya teardown transport firehose"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "chat/index.tsx refactor: baca store per-session, startRun/cancelRun, hapus guard global",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:42.515Z",
+              "note": "chat/index.tsx REFACTOR (326->291): state messages/isStreaming/AbortController lokal dihapus; baca useChatSessionStore selector stabil; submit -> startRun fire-and-forget + setActiveRun; stop -> cancelRun; guard auto-submit baca status store. Verifikasi: tsc 0 error di file tersentuh; lint exit 0 tanpa warning baru; drift check zero drift"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "goal": "Follow-up (post-merge)",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "E2E lane: 2-session parallel, switch-mid-run, reconnect idle>60s, cancel isolation",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 2,
+          "title": "auth + per-workspace filter (gate multi-tenant)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 3,
+          "title": "cleanup unused exports di frontend/src/routes/u/route.tsx",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "unit test store + provider (Zustand + connectStream mock)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    }
+  ]
+}

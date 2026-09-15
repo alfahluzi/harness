@@ -1,0 +1,166 @@
+{
+  "created_at": "2026-09-15T16:03:39.493Z",
+  "updated_at": "2026-09-15T16:03:47.879Z",
+  "phases": [
+    {
+      "id": 1,
+      "goal": "Fase 1 — Backend (SessionManager + MCP server)",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "config.ts (langgraphUrl, graphId, maxConcurrency)",
+          "detail": "Realita: backend/src/global/config.ts.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:45.979Z",
+              "note": "Shipped ccd7778: config langgraphUrl/graphId/maxConcurrency di backend/src/global/config.ts."
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "session schema zod (CreateSessionInput, SessionIdInput/TaskIdInput, SendMessageInput)",
+          "detail": "Realita: backend/src/modules/sessions/schema.ts.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:46.197Z",
+              "note": "Shipped ccd7778: zod schema session di backend/src/modules/sessions/schema.ts (CreateSessionInput, SessionIdInput/TaskIdInput, SendMessageInput)."
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "SessionManager/SessionService: registry, concurrency slot, notifyParent",
+          "detail": "Realita: backend/src/modules/sessions/service.ts.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:46.424Z",
+              "note": "Shipped ccd7778/801dc9d: SessionService di backend/src/modules/sessions/service.ts — registry task, concurrency slot, notifyParent."
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "MCP server wrapping SessionManager as MCP tools (backend/src/server.mcp.ts)",
+          "detail": "5 tools: create_session, get_session_status, get_session_result, send_session_message, delete_session.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:46.649Z",
+              "note": "Shipped ccd7778: backend/src/server.mcp.ts — SessionService dibungkus 5 MCP tools (create/status/result/send/delete)."
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "mount /mcp (Streamable HTTP) + REST routes di Hono app",
+          "detail": "Realita: backend/src/modules/sessions/route.ts (REST) + backend/src/index.ts (mount /mcp).",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:46.864Z",
+              "note": "Shipped ccd7778: REST di backend/src/modules/sessions/route.ts; /mcp Streamable HTTP dimount di backend/src/index.ts."
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "graceful shutdown: cancelAll on SIGINT/SIGTERM",
+          "detail": "Realita: backend/src/index.ts.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:47.081Z",
+              "note": "Shipped ccd7778: cancelAll dipanggil saat SIGINT/SIGTERM di backend/src/index.ts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "goal": "Fase 2 — Agent MCP client",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "agent/src/base/tools/mcp-client.ts: MultiServerMCPClient + thread-id injection wrapper",
+          "detail": "create_session di-wrap; config.configurable.thread_id disuntik sebagai parent.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:47.303Z",
+              "note": "Shipped 801dc9d: agent/src/base/tools/mcp-client.ts — MultiServerMCPClient + wrapper injeksi config.configurable.thread_id sebagai parent."
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "register MCP-derived tools di agent/src/base/tools/index.ts",
+          "detail": "Registry tool agent memuat 5 tool MCP.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:47.542Z",
+              "note": "Shipped 801dc9d: tool MCP terdaftar di registry agent/src/base/tools/index.ts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "goal": "Fase 3 — Verifikasi",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "testing checklist: handshake /mcp, loadSessionManagerTools 5 tools, create_session parent injection, background sync/async, status/result transitions, notifyParent, send_session_message, delete_session, SIGINT",
+          "detail": "Checklist lengkap ada di progres task ini.",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:47.768Z",
+              "note": "Verifikasi manual end-to-end selesai: handshake /mcp, 5 tools, injeksi parent, background sync/async, transisi status/result, notifyParent, send_session_message, delete_session, SIGINT."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "goal": "Fase 4 — Hardening / open decisions",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "docker-compose connectivity antar proses (agent/backend/frontend)",
+          "detail": "docker-compose.yml masih kosong; pastikan MCP connectivity di level network container.",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 2,
+          "title": "durable registry (Redis/SQLite) supaya survive backend restart",
+          "detail": "Registry in-memory hilang saat restart; acceptable untuk MVP.",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 3,
+          "title": "ganti polling acquireSlot dengan p-queue",
+          "detail": "acquireSlot saat ini polling setTimeout 500ms.",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "verifikasi config.graphId vs client.assistants.search()",
+          "detail": "Jangan asumsikan graphId 'graph' benar tanpa cek assistant yang diekspos LangGraph server.",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    }
+  ]
+}

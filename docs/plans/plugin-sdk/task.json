@@ -1,0 +1,532 @@
+{
+  "created_at": "2026-09-15T16:03:45.026Z",
+  "updated_at": "2026-09-15T16:03:58.433Z",
+  "phases": [
+    {
+      "id": 1,
+      "goal": "Fase 0 — Scaffolding",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "scaffold root bun workspace (workspaces: packages/*)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:52.727Z",
+              "note": "root package.json + workspaces [packages/*]; bun install exit 0"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "scaffold packages/ skeleton: sdk-shared, sdk-frontend, sdk-backend, sdk-agent, cli",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:52.946Z",
+              "note": "5 SDK pkgs sdk-shared/frontend/backend/agent + cli + bin/puna-plugin.mjs stub; bun pm ls resolves workspace:*"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "scaffold agent/scripts/",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:53.178Z",
+              "note": "agent/scripts/README.md placeholder untuk Fase 6 link-plugin-graphs.ts"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "scaffold templates/plugin/: sticky-notes, mermaid-renderer, logging-hook, research-agent",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:53.406Z",
+              "note": "4 archetype lengkap: sticky-notes, mermaid-renderer, logging-hook, research-agent"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "document Fase 0 di plugin-sdk-strategy §10",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:53.628Z",
+              "note": "strategy §10 dokumentasikan Fase 0 (+12 lines)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "goal": "Fase 1 — Foundation (Zod + list-only backend)",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "PluginManifest + PluginSummary Zod (packages/sdk-shared/src/manifest.ts)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:53.849Z",
+              "note": "sdk-shared manifest.ts + source.ts (zod v4 strict, path-traversal guard); 16/16 tests pass"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "layered discovery mergeLayered3 (backend/src/global/workspace-scanner.ts)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:54.068Z",
+              "note": "workspace-scanner mergeLayered3 + ThreeLayerSource; 42/42 tests pass"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "PluginService + PluginHost list-only (backend/src/modules/plugins/)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:54.297Z",
+              "note": "plugins/service.ts 3-layer scan + kind derivation + best-effort list; host.ts Fase 4 stub + singleton"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "/api/plugins + /api/plugins/{id} routes (OpenAPI)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:54.525Z",
+              "note": "plugins/route.ts /api/plugins + /api/plugins/{id}; openapi.json 28 routes; SDK schema inlined, no Zod duplikasi"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "update backend/AGENTS.md Plugins Module",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:54.744Z",
+              "note": "backend/AGENTS.md +21 baris: ## Plugins Module"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "goal": "Fase 2 — Frontend slots + sticky-notes sample",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "PluginHostProvider + registry fetcher",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:54.951Z",
+              "note": "sdk-frontend registry (list + parallel detail, allSettled), host provider + hooks, slots + error boundary, loader, source badge; PluginHostProvider mount di main.tsx"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "PluginSlot helpers + error boundary",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:55.171Z",
+              "note": "PluginSlot + PluginErrorBoundary (log + fallback); per-slot boundary; data-plugin-* attrs"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "leftBar slot injection di u/route.tsx",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:55.398Z",
+              "note": "LeftDockWithPlugins di routes/u/route.tsx:124 — DOCK_ITEMS + pluginLeftBar memoized"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "footerBar 3-region slot injection",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:55.624Z",
+              "note": "footer-bar.tsx 3 region diwrap PluginSlot; Plugins: counter dari registry.plugins.size"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "sample plugin sticky-notes",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:55.847Z",
+              "note": "sticky-notes strict PluginManifest + full UI (list/add/delete, localStorage) + footer counter"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "PluginSummary.source badge UI",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:56.072Z",
+              "note": "PluginSourceBadge (hijau/biru/ungu + kind suffix); dock title + source dot"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "goal": "Fase 3 — Chat renderers + tool UI + schema migration",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "ChatMessage schema migration (toolName/args/result)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:56.309Z",
+              "note": "chat-types.ts tambah toolName?/args?/result? (opsional, backward-compat)"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "adapter chat-request.tsx role dispatch",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:56.531Z",
+              "note": "chat-request.tsx role dispatch via usePluginChatRenderers sebelum core bubble; PluginErrorBoundary wrap"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "chatRenderers slot",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:56.765Z",
+              "note": "sdk-frontend usePluginChatRenderers + tipe renderer; useResolvedModuleMap batch resolver"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "toolUi slot di msg-tool",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:56.996Z",
+              "note": "msg-tool.tsx usePluginToolUi custom path + data-plugin-tool; WeakMap owner attribution"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "sample plugin mermaid-renderer",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:57.213Z",
+              "note": "mermaid-renderer strict manifest + toolUi mermaid: MermaidDiagram (raw source + copy, no runtime)"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "ui-bundle dev serve GET /api/plugins/{id}/ui-bundle",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:57.428Z",
+              "note": "GET /api/plugins/{id}/ui-bundle via Bun.build; 200/400/404/500 + cache; openapi 29 routes"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "React strict boundary per slot",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:57.656Z",
+              "note": "slots.tsx per-slot PluginErrorBoundary sudah benar (baseline Fase 2)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "goal": "Fase 4 — Backend hooks",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "PluginHost.discoverAndLoad execute",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 2,
+          "title": "transformSystemPrompt pipeline",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 3,
+          "title": "extraAgents + overrideAgentConf merge",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "tools factory -> .runtime/plugin-tools.json + agent register",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 5,
+          "title": "permissions enforcement (fs/net/shell)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "goal": "Fase 5 — Node lifecycle (HTTP hooks)",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "withPluginHooks bridge (agent)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 2,
+          "title": "wrap callModel + callTool",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 3,
+          "title": "/api/plugins/hooks RPC",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "sample plugin logging-hook",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 5,
+          "title": "hook timeout 5s",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "goal": "Fase 6 — Custom graphs",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "manifest graphs[] resolver (link-plugin-graphs.ts)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 2,
+          "title": "wire to dev.sh",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 3,
+          "title": "sample plugin research-agent graph",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "namespace policy <pluginId>.<name>",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "goal": "Fase 7 — SDK + publish",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "publish @puna/sdk-shared (verdaccio / bun link)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 2,
+          "title": "publish sdk-frontend, sdk-backend, sdk-agent",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 3,
+          "title": "puna plugin create CLI",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "puna plugin dev watch",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 5,
+          "title": "puna plugin build",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 6,
+          "title": ".docs/plugin-authoring.md",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "goal": "Workspace Migration — unified bun workspace",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "unified bun workspace migration (root workspaces + backend/frontend, bunfig isolated linker, lockfile unification)",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:57.869Z",
+              "note": "root workspaces + backend/frontend; bunfig isolated linker; hapus per-app lockfile; zod dedupe; PluginManifest named OpenAPI component; 58/58 tests"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "goal": "Cross-cutting tasks",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "update frontend/AGENTS.md plugin section",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:58.093Z",
+              "note": "frontend/AGENTS.md + ## Plugin Slots (registry contract, slot regions, error-boundary policy)"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "update backend/AGENTS.md plugin module rule",
+          "detail": "",
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T16:03:58.312Z",
+              "note": "backend/AGENTS.md + ## Plugins Module (3-layer, no schema.ts, host stub, list-only, class service)"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "sample plugins tested per OS (linux/darwin)",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        },
+        {
+          "id": 4,
+          "title": "performance budget: plugin load <=100ms p95",
+          "detail": "",
+          "status": "todo",
+          "progress": []
+        }
+      ]
+    }
+  ]
+}

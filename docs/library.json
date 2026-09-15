@@ -1,0 +1,530 @@
+{
+  "backend/drizzle.config.ts": {
+    "summary": "Drizzle Kit config for the backend: points at the SQLite models in `./src/models/*.ts` and anchors the DB path to the backend dir (SQLITE_PATH/BACKEND_DB_PATH env overrides, default ../data/shared.db) so commands work from any CWD."
+  },
+  "backend/drizzle/0000_init.sql": {
+    "summary": "Initial Drizzle migration SQL: creates the `sessions`, `providers`, and `provider_models` tables with their workspace indexes and the cascading composite FK from provider_models to providers."
+  },
+  "backend/scripts/dump-openapi.ts": {
+    "summary": "Dev script that boots the OpenAPIHono app in-process (no network listener), fetches `/doc`, and writes the generated OpenAPI spec to disk (default `backend/openapi.json`)."
+  },
+  "backend/scripts/seed-agent.ts": {
+    "summary": "Manual-testing seed script driven by env vars: ensures a `.puna` workspace config, writes an agent profile (`prompt.md` + `conf.json`), and connects a provider via `ProviderService` so the runtime can be exercised."
+  },
+  "backend/src/global/agent-runtime.test.ts": {
+    "summary": "Bun tests for `resolveAgentRuntimeConfig`: local/global provider resolution, global profile fallback, model resolution via provider_models, request model override, and AgentRuntimeError on missing profile/provider."
+  },
+  "backend/src/global/agent-runtime.ts": {
+    "summary": "Resolves an agent profile into the runtime config LangGraph needs (provider name/URL/API key, model, system prompt, tool allow/deny) from the layered `agents/` dirs and the providers DB; exports `resolveAgentRuntimeConfig` and `AgentRuntimeError`."
+  },
+  "backend/src/global/config.ts": {
+    "summary": "App-wide configuration constants: LangGraph URL and graph id, per-agent max concurrency, and XDG-aware system-wide MCP/provider directories with `PUNA_*` env overrides."
+  },
+  "backend/src/global/db.ts": {
+    "summary": "Opens the shared SQLite database (anchored to `data/shared.db` in the repo root, env-overridable), enables WAL and foreign keys, and exports the raw bun:sqlite handle plus a Drizzle instance bound to the model schema."
+  },
+  "backend/src/global/errors.ts": {
+    "summary": "Shared backend error classes; currently `ThreadBusyError`, thrown when a message targets a session whose LangGraph thread already has an active run (mapped to HTTP 409 by routes)."
+  },
+  "backend/src/global/path-resolver.test.ts": {
+    "summary": "Bun tests for `PathResolver`: resolving relative paths under a root, normalizing absolute paths, `relative`, and `isInside` containment including prefix-sibling safety."
+  },
+  "backend/src/global/path-resolver.ts": {
+    "summary": "Small `PathResolver` class that resolves paths against a workspace root and checks containment (`resolve`, `relative`, `isInside`)."
+  },
+  "backend/src/global/stream-bus.ts": {
+    "summary": "Global in-memory `StreamBus` EventEmitter for run stream envelopes plus the `ConnectionMux` SSE adapter that filters by workspace, buffers with a bounded drop-oldest queue, drains to the ReadableStream, and emits heartbeats."
+  },
+  "backend/src/global/workspace-context.ts": {
+    "summary": "Loads and validates `<configDir>/config.json` (required `id` and `version`, optional `globalConfigDir`) into a `WorkspaceContext`; throws `InvalidWorkspaceError` for missing/invalid workspace config."
+  },
+  "backend/src/global/workspace-scanner.test.ts": {
+    "summary": "Bun tests for the workspace scanner: `scanLayer` marker filtering, `mergeLayered`/`mergeLayered3` precedence rules, `resolveSource`, `expandTilde`, and `findWorkspaceDirs` traversal, depth, ignore lists, and symlink handling."
+  },
+  "backend/src/global/workspace-scanner.ts": {
+    "summary": "Filesystem layering utilities used by all workspace-scoped modules: `expandTilde`, `findWorkspaceDirs`, `scanLayer`, `mergeLayered` (local/global), `mergeLayered3` (local/workspace-global/system-global), `resolveSource`, and `defaultSystemPluginDir`."
+  },
+  "backend/src/models/index.ts": {
+    "summary": "Barrel file re-exporting all Drizzle table definitions (sessions, providers, provider-models) for the shared schema."
+  },
+  "backend/src/models/provider-models.ts": {
+    "summary": "Drizzle table definition for `provider_models`: composite PK (workspace_id, provider_id, model_id), index on provider, and cascade FK to providers; exports inferred row/insert types."
+  },
+  "backend/src/models/providers.ts": {
+    "summary": "Drizzle table definition for `providers` (id/workspace composite PK, type, base URL, server-stored API key, default model) plus the `GLOBAL_WORKSPACE_ID` (`__global__`) sentinel for globally connected providers."
+  },
+  "backend/src/models/sessions.ts": {
+    "summary": "Drizzle table definition for `sessions`: description, parent/child thread ids, run id, background flag, configDir, model, status, timestamps, result JSON, error, and active checkpoint id."
+  },
+  "backend/src/modules/agents/route.ts": {
+    "summary": "Hono OpenAPI routes `GET /agents` and `GET /agents/:name` that delegate to AgentService and map `AgentNotFoundError`/`InvalidWorkspaceError` to 404/400."
+  },
+  "backend/src/modules/agents/schema.ts": {
+    "summary": "Zod schemas for the agents API: config-dir query and name param, tools shape, and the AgentsListResponse/AgentDetailResponse/ErrorResponse payloads registered with OpenAPI."
+  },
+  "backend/src/modules/agents/service.test.ts": {
+    "summary": "Bun tests for AgentService `list` and `get`, verifying local-over-global merge precedence, additive local agents, prompt/conf reads, and not-found errors."
+  },
+  "backend/src/modules/agents/service.ts": {
+    "summary": "AgentService: lists and reads file-based agent profiles by merging local and global `agents/` layers (prompt.md marker) and parsing `conf.json` metadata (role, temperature, tools, provider/model)."
+  },
+  "backend/src/modules/mcps/registry.ts": {
+    "summary": "Thin HTTP client (`RegistryClient`) for the official MCP Registry search/detail endpoints, with RegistryError/RegistryNotFoundError and normalization helpers that convert raw registry JSON into the public summary/detail shapes."
+  },
+  "backend/src/modules/mcps/route.ts": {
+    "summary": "Hono OpenAPI routes for MCPs: registry search and detail, installed list/detail, install, and uninstall, translating service/registry errors into 400/404/409/502 responses."
+  },
+  "backend/src/modules/mcps/schema.ts": {
+    "summary": "Zod schemas for the MCP module: raw registry server shapes, normalized PublicMcpSummary/Detail, installed `InstallConf`, list/install/uninstall responses, and params; also side-effect imports `@hono/zod-openapi` so the zod `.openapi()` extension is"
+  },
+  "backend/src/modules/mcps/service.test.ts": {
+    "summary": "Bun tests for McpService and RegistryClient against a fake Bun registry server: local-over-global installed merging, env-var counting, install to local/system targets, conflict/404 handling, and uninstall across layers."
+  },
+  "backend/src/modules/mcps/service.ts": {
+    "summary": "McpService: installs public MCPs by fetching registry detail and writing `.puna/mcps/<name>/conf.json` (or the system dir for target=global), and lists/gets/uninstalls installed MCPs across local, workspace-global, and system-wide layers with"
+  },
+  "backend/src/modules/plugins/host.ts": {
+    "summary": "Fase 1 `PluginHost` stub plus the module-level `pluginHost` singleton: caches loaded PluginSummary objects (`setLoaded`/`list`/`get`), with lifecycle-hook, tool, graph, and prompt-transformer accessors reserved for Fase 4."
+  },
+  "backend/src/modules/plugins/route.ts": {
+    "summary": "Hono OpenAPI plugin routes: 3-layer list, manifest detail resolved by manifest id, and `GET /plugins/:id/ui-bundle` which serves pre-bundled JS or builds TS/TSX on the fly with Bun.build (externals for React/router) behind an in-memory cache;"
+  },
+  "backend/src/modules/plugins/service.ts": {
+    "summary": "PluginService: discovers plugins across workspace-local, workspace-global, and system-global layers, strictly parses `plugin.json` into PluginManifest, degrades bad manifests to minimal summaries for list, and derives plugin kind"
+  },
+  "backend/src/modules/providers/provider-repository.ts": {
+    "summary": "ProviderRepository: prepared bun:sqlite statements for the `providers` table (insert, composite get, listForWorkspace including global sentinel, listGlobal, update, delete) plus `existsInScope`, mapping rows to ProviderRecord."
+  },
+  "backend/src/modules/providers/repository.ts": {
+    "summary": "ProviderModelRepository: prepared statements for `provider_models` (replaceAll for model sync, listByProvider, listProvidersByModel returning local before global, count, delete) used by the provider service and agent runtime."
+  },
+  "backend/src/modules/providers/route.ts": {
+    "summary": "Hono OpenAPI provider routes (list, detail, models, credentials test, connect, update, disconnect) that delegate to ProviderService and map its error classes to 400/404/409 responses."
+  },
+  "backend/src/modules/providers/schema.ts": {
+    "summary": "Zod schemas for the providers API: connect/update/test bodies with ProviderKind enum, never-raw-key ProviderSummary/ProviderDetail (masked key), models list, test result, disconnect response, and error envelope."
+  },
+  "backend/src/modules/providers/service.test.ts": {
+    "summary": "Bun tests for ProviderService using an in-memory SQLite DB and a fake provider HTTP server: connect + model sync, local-vs-global shadowing, credential testing, update key retention/rotation, custom providers, and cascade delete on disconnect."
+  },
+  "backend/src/modules/providers/service.ts": {
+    "summary": "ProviderService: connect/update/disconnect/test/list for LLM providers, holds a per-kind catalog (base URL, default model), syncs models from each provider's `/models` endpoint into provider_models, dedupes local-over-global rows, and masks API keys"
+  },
+  "backend/src/modules/sessions/repository.ts": {
+    "summary": "SessionRepository: prepared SQL statements for the `sessions` table (insert/get/list/by-workspace/by-parent, status/runId/result/error/checkpoint setters, delete) plus SessionRecord types and SessionNotFoundError."
+  },
+  "backend/src/modules/sessions/route.ts": {
+    "summary": "Hono routes for sessions: create, list, status, result, message, stream start, cancel, messages, restart, switch-branch, and delete, plus the plain SSE `GET /sessions/stream` firehose wired to `ConnectionMux` and the exported stream-bus workspace"
+  },
+  "backend/src/modules/sessions/schema.ts": {
+    "summary": "Zod input schemas for the sessions module: create, id, send-message, stream-message, restart (with checkpointId), and switch-branch payloads, shared by the REST routes and the MCP tool server."
+  },
+  "backend/src/modules/sessions/service.test.ts": {
+    "summary": "Bun tests for StreamBus/ConnectionMux (seq ordering, bounded queue, heartbeat, workspace filter) and SessionService run streaming/branching (persist-before-done, cancel vs error envelopes, getMessages branch chain/siblings, restart fork/replace,"
+  },
+  "backend/src/modules/sessions/service.ts": {
+    "summary": "Core SessionService: creates LangGraph threads and session rows, launches background or synchronous runs with per-thread mutexes and max-concurrency slots, relays run stream parts into the global StreamBus via a detached consumer, persists"
+  },
+  "backend/src/modules/skills/route.ts": {
+    "summary": "Hono OpenAPI routes `GET /skills` and `GET /skills/:name` for listing and reading workspace skills, mapping not-found/invalid-workspace errors to 404/400."
+  },
+  "backend/src/modules/skills/schema.ts": {
+    "summary": "Zod schemas for the skills API: config-dir query, name param, script info, and the SkillsListResponse/SkillDetailResponse/ErrorResponse payloads."
+  },
+  "backend/src/modules/skills/service.test.ts": {
+    "summary": "Bun tests for SkillService list/get: local-over-global merge precedence, script listing from the resolved source, and SkillNotFoundError behavior."
+  },
+  "backend/src/modules/skills/service.ts": {
+    "summary": "SkillService: merges local and global `skills/` layers using the `desc.md` marker and returns skill summaries (description, script count) and details including the `scripts/` file listing."
+  },
+  "backend/src/modules/workspaces/route.ts": {
+    "summary": "Hono OpenAPI route `GET /workspaces/discover` that recursively scans a root (tilde-expanded, defaults to home) for `.puna` directories and returns each path with its workspace id read from config.json."
+  },
+  "backend/src/modules/workspaces/schema.ts": {
+    "summary": "Zod schemas for the workspaces module: discovery root query, discovered workspace entry (path + nullable id), discovery response, and shared error envelope."
+  },
+  "backend/src/server.mcp.ts": {
+    "summary": "Builds the MCP server (`buildMcpServer`) that exposes agent-harness capabilities as tools over @modelcontextprotocol/sdk: session create/list/status/result/message/delete, agent and skill listing/lookup, and MCP registry"
+  },
+  "backend/src/server.ts": {
+    "summary": "Backend entry point: creates the OpenAPIHono app with logger/CORS, root and health routes, a `/doc` route that normalizes `:param` paths to OpenAPI curly braces, mounts all module routers under `/api`, serves the MCP Streamable HTTP transport at"
+  },
+  "frontend/openapi-ts.config.ts": {
+    "summary": "@hey-api/openapi-ts codegen config for the frontend API client: reads ../backend/openapi.json and writes src/lib/api with the @hey-api/typescript, @hey-api/sdk, @hey-api/client-fetch and @tanstack/react-query plugins."
+  },
+  "frontend/src/lib/api/@tanstack/react-query.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): TanStack Query bindings for every SDK operation - queryKey helpers, queryOptions/infiniteQueryOptions and mutation options calling the SDK functions."
+  },
+  "frontend/src/lib/api/client.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): instantiates the shared fetch client (createClient(createConfig())) and exports it as `client` plus the CreateClientConfig type used to top up its configuration."
+  },
+  "frontend/src/lib/api/client/client.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): createClient factory implementing the fetch request pipeline - config merge, interceptors, request/response handling, auth, parameter serialization and SSE support."
+  },
+  "frontend/src/lib/api/client/index.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): barrel entrypoint for the generated client folder, re-exporting createClient, createConfig, mergeHeaders, core serializer/auth helpers and all client type definitions."
+  },
+  "frontend/src/lib/api/client/types.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): type definitions for the generated fetch client - Config, ClientOptions, RequestOptions, ResolvedRequestOptions, RequestResult, ResponseStyle and TDataShape."
+  },
+  "frontend/src/lib/api/client/utils.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): client utility helpers including query serialization, header merging, URL building, auth param injection and config merging used by createClient."
+  },
+  "frontend/src/lib/api/core/auth.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): auth primitives - the Auth security-scheme type and getAuthToken, which resolves a token callback and formats it for header, query or cookie transport."
+  },
+  "frontend/src/lib/api/core/bodySerializer.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): body/query serializer definitions and built-in body serializers for JSON, FormData and URLSearchParams request payloads."
+  },
+  "frontend/src/lib/api/core/params.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): buildClientParams - maps typed operation params into body, headers, path and query slots according to the generated field metadata."
+  },
+  "frontend/src/lib/api/core/pathSerializer.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): OpenAPI-style path/query parameter serializers for primitive, array and object values (form, spaceDelimited, pipeDelimited, label, matrix, simple, deepObject)."
+  },
+  "frontend/src/lib/api/core/queryKeySerializer.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): helpers that convert query keys to JSON-safe values and back, including serialization/replacement of non-JSON types such as Date and bigint."
+  },
+  "frontend/src/lib/api/core/serverSentEvents.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): server-sent events client (createSseClient and SSE option/event types) powering the generated streaming endpoints."
+  },
+  "frontend/src/lib/api/core/types.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): core client type contracts - HttpMethod, Client, Config, RequestOptions, ClientMeta and other transport-level interfaces."
+  },
+  "frontend/src/lib/api/core/utils.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): core URL utilities such as PATH_PARAM_RE, defaultPathSerializer and getUrl that interpolate path params and assemble final request URLs."
+  },
+  "frontend/src/lib/api/index.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): public barrel for the generated API client, re-exporting all SDK functions, request/response/error types and the Options type."
+  },
+  "frontend/src/lib/api/sdk.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): typed SDK functions for the backend routes - sessions (create/get/message/stream/cancel/restart), agents, providers, MCPs, plugins, skills, workspaces and health."
+  },
+  "frontend/src/lib/api/types.gen.ts": {
+    "summary": "Auto-generated by @hey-api/openapi-ts (do not edit manually): TypeScript models derived from the backend OpenAPI schema - request/response/error types for every endpoint (sessions, agents, providers, MCPs, plugins, skills, workspaces)."
+  },
+  "frontend/vite.config.ts": {
+    "summary": "Vite config for the React frontend: TanStack Router plugin (auto code splitting, '-' route ignore prefix), React and Tailwind plugins, plus resolve aliases mapping @ to ./src and pinning react/react-dom to the frontend's own node_modules for bundled"
+  },
+  "frontend/src/routes/-helpers/format.ts": {
+    "summary": "Tiny route helper exporting formatUserId(id), which prefixes a raw user id with the usr_ display prefix."
+  },
+  "frontend/src/routes/__root.tsx": {
+    "summary": "TanStack Router root route for the frontend; wraps the entire app in the SSE StreamProvider (configured with API_BASE_URL) and renders the child outlet."
+  },
+  "frontend/src/routes/index.tsx": {
+    "summary": "Landing page route at /; renders the Puna title and a link into the /u users area."
+  },
+  "frontend/src/routes/u/$id/index.tsx": {
+    "summary": "Dynamic user-detail route (/u/$id/); reads the id path param via Route.useParams and displays it as a placeholder heading."
+  },
+  "frontend/src/routes/u/-components/UserCard.tsx": {
+    "summary": "Minimal placeholder card component that renders a name prop inside a bordered box; appears to be a legacy/stub component under the u route folder."
+  },
+  "frontend/src/routes/u/-components/agents-nav-panel.tsx": {
+    "summary": "Left-dock Agents panel; loads agents with useAgents and lists them in collapsible Local/Global sections, each row showing name, source badge, and description or role."
+  },
+  "frontend/src/routes/u/-components/mcp-nav-panel.tsx": {
+    "summary": "Left-dock MCP panel; performs registry search via useMcpSearch and drives install (with choice of local project vs global system target) plus uninstall flows through the MCP hooks."
+  },
+  "frontend/src/routes/u/-components/skills-nav-panel.tsx": {
+    "summary": "Left-dock Skills panel; groups useSkills results into collapsible Local/Global sections and shows each skill name, source badge, and description or script count."
+  },
+  "frontend/src/routes/u/chat/-components/agent-model-select.tsx": {
+    "summary": "Presentational pair of select controls for picking the agent profile and provider model for a chat message, including disabled, loading, and no-models states."
+  },
+  "frontend/src/routes/u/chat/-components/chat-panel.tsx": {
+    "summary": "Chat transcript panel; groups messages by human turn, renders each group through ChatRequest, auto-scrolls on new messages/stream content, and shows a workspace guard or session status header."
+  },
+  "frontend/src/routes/u/chat/-components/chat-request.tsx": {
+    "summary": "Renders one human-turn message group; maps human/ai/tool bubbles, applies plugin chatRenderers overrides inside PluginErrorBoundary, appends the live streaming AI bubble, and sums per-message token usage into a footer."
+  },
+  "frontend/src/routes/u/chat/-components/composer-button.tsx": {
+    "summary": "Reusable icon button for the chat composer toolbar, bundling shared size, hover, and focus-visible styling around native button props."
+  },
+  "frontend/src/routes/u/chat/-components/composer.tsx": {
+    "summary": "Chat composer UI; auto-resizing textarea with send/stop button switching, error or info note, and the embedded AgentModelSelect for choosing agent and model."
+  },
+  "frontend/src/routes/u/chat/-components/msg-ai.tsx": {
+    "summary": "AI message bubble that renders content as markdown via the shared Markdown component and shows a pulsing caret while streaming."
+  },
+  "frontend/src/routes/u/chat/-components/msg-human.tsx": {
+    "summary": "Human message bubble rendered right-aligned; adds branch sibling navigation (branchIndex/branchTotal with previous/next checkpoint switching) and a restart-from-this-message checkpoint action."
+  },
+  "frontend/src/routes/u/chat/-components/msg-tool.tsx": {
+    "summary": "Tool message bubble; looks up a plugin-provided toolUi renderer by tool name via usePluginToolUi, wrapping it in PluginErrorBoundary, and falls back to a default monospace bubble for legacy/unknown tools."
+  },
+  "frontend/src/routes/u/chat/-hooks/use-agent-model.ts": {
+    "summary": "Chat hook managing agent-profile and model selection: loads agents/providers/models, resolves defaults (agent preferred model or first available), persists both selections in localStorage, and reports loading/status flags."
+  },
+  "frontend/src/routes/u/chat/index.tsx": {
+    "summary": "Chat route (/u/chat/); the main chat page that creates sessions from sessionId/prompt search params, loads message history, binds the global chat-session store and SSE subscription, and handles submit, restart, branch switch, and stop for ChatPanel"
+  },
+  "frontend/src/routes/u/index.tsx": {
+    "summary": "Users index route (/u/); simple landing page with a link to the workspace page."
+  },
+  "frontend/src/routes/u/route.tsx": {
+    "summary": "Layout route for the /u section; renders HeaderBar, a left dock of workspace/chat/MCPs/agents/skills/settings items extended with plugin leftBar entries, the MainPanel outlet, and FooterBar."
+  },
+  "frontend/src/routes/u/settings/-components/provider-catalog.ts": {
+    "summary": "Static catalog mapping each ProviderType (openai, anthropic, google, openrouter, custom) to its display label, API-key placeholder, default base URL, and badge/dot styling used by the settings page."
+  },
+  "frontend/src/routes/u/settings/index.tsx": {
+    "summary": "Settings route (/u/settings/); provider-connection management UI with one expandable accordion per provider type, API key/base URL/name inputs, test-before-save gating, update, and two-step confirm disconnect."
+  },
+  "frontend/src/routes/u/workspace/-components/agents-panel.tsx": {
+    "summary": "Workspace agents panel; master list of agents with SourceBadge plus a detail view showing resolved dir, role, temperature, and allow/deny tool lists and the agent prompt."
+  },
+  "frontend/src/routes/u/workspace/-components/sessions-panel.tsx": {
+    "summary": "Workspace session-history panel; lists useSessions results with status badge, session id, created time, and human-readable duration formatting."
+  },
+  "frontend/src/routes/u/workspace/-components/skills-panel.tsx": {
+    "summary": "Workspace skills panel; master list of skills with SourceBadge and a detail view of the skill description, resolved dir, and bundled script names."
+  },
+  "frontend/src/routes/u/workspace/-components/source-badge.tsx": {
+    "summary": "Small badge chip rendering the local/global layer source of an agent, skill, or MCP with amber/sky color coding."
+  },
+  "frontend/src/routes/u/workspace/-components/workdir-picker.tsx": {
+    "summary": "Workspace selector; provides a free-text .puna path form to set or clear the active workdir and lists discovered workspaces from useDiscoveredWorkspaces for one-click activation."
+  },
+  "frontend/src/routes/u/workspace/index.tsx": {
+    "summary": "Workspace route (/u/workspace/); composes the WorkdirPicker and, only once a workdir is active, the SessionsPanel, with an empty-state prompt otherwise."
+  },
+  "frontend/ecosystem.config.cjs": {
+    "summary": "PM2 ecosystem config that runs the frontend dev server as the \"harness-labs\" app (`npm run dev -- --host 0.0.0.0`) with NODE_ENV=development; the hardcoded cwd still points at an older Labs/Puna/frontend path."
+  },
+  "frontend/src/components/markdown.tsx": {
+    "summary": "Exports the `Markdown` component that renders assistant message content with react-markdown, Tailwind-styled headings/lists/links/blocks, a per-block copy button, and react-syntax-highlighter (oneDark) for fenced code blocks."
+  },
+  "frontend/src/components/stream-provider.tsx": {
+    "summary": "`StreamProvider` owns the app's single global SSE firehose: lazily connects while at least one session is subscribed via sessionTracker, reconnects with exponential backoff plus jitter, closes after 5s idle, and pushes parsed events into the chat"
+  },
+  "frontend/src/hooks/use-active-workdir.tsx": {
+    "summary": "React context provider and `useActiveWorkdir` hook holding the active config/workspace directory, persisted in localStorage under `puna:configDir` and synced across browser tabs via the storage event."
+  },
+  "frontend/src/hooks/use-agents.ts": {
+    "summary": "TanStack Query hooks `useAgents` and `useAgent` that fetch the agent profile list and a single agent by name from the backend, keyed on the active configDir and disabled until one is selected."
+  },
+  "frontend/src/hooks/use-create-session.ts": {
+    "summary": "`useCreateSession` mutation wrapping postApiSessions that forces `start: false` (the SSE stream drives the first run so it cannot hit a busy-thread 409) and invalidates the workspace's sessions query on success."
+  },
+  "frontend/src/hooks/use-discovered-workspaces.ts": {
+    "summary": "`useDiscoveredWorkspaces` query hook wrapping GET /api/workspaces/discover to list workspace directories under an optional root path, cached with a 60s stale time."
+  },
+  "frontend/src/hooks/use-mcps.ts": {
+    "summary": "Hook suite for MCP servers: debounced registry search, public registry detail, installed list/detail scoped by configDir, and install/uninstall mutations that invalidate installed-MCP queries."
+  },
+  "frontend/src/hooks/use-providers.ts": {
+    "summary": "Hook suite for LLM provider management: list/detail/models queries plus test-credentials, connect, update, and disconnect mutations, all scoped to the active configDir and invalidating provider queries on success."
+  },
+  "frontend/src/hooks/use-sessions.ts": {
+    "summary": "`useSessions` query hook listing chat sessions for the active workspace (query param workspaceId = configDir) with a 5s stale time."
+  },
+  "frontend/src/hooks/use-skills.ts": {
+    "summary": "TanStack Query hooks `useSkills` and `useSkill` fetching the skill list and a single skill by name for the active configDir."
+  },
+  "frontend/src/hooks/use-theme.ts": {
+    "summary": "`useTheme` hook managing light/dark mode by toggling the `dark` class on documentElement and persisting the choice to localStorage under `theme`."
+  },
+  "frontend/src/layout/chat-nav-panel.tsx": {
+    "summary": "`ChatNavPanel` renders the left navigation list of chat sessions for the active workspace, with status dots, relative timestamps, a \"New chat\" link, and loading/empty-workspace states."
+  },
+  "frontend/src/layout/footer-bar.tsx": {
+    "summary": "`FooterBar` is the app status footer: hosts plugin slots for footerBar.left/middle/right and shows buttons for user, active workspace, plugin count, and placeholder MCP/token/bill stats."
+  },
+  "frontend/src/layout/header-bar.tsx": {
+    "summary": "`HeaderBar` is the top bar with Models/Pricing/Docs nav buttons, a search input, the dark/light theme toggle, and a right-panel toggle button."
+  },
+  "frontend/src/layout/left-bar.tsx": {
+    "summary": "`LeftBar` is the icon dock that tracks the active navigation item and renders a resizable `NavigationPanel` containing the selected item's panel content, supporting both route links and in-place buttons."
+  },
+  "frontend/src/layout/main-panel.tsx": {
+    "summary": "`MainPanel` is a presentational wrapper providing the bordered, scrollable card container for the main routed content area."
+  },
+  "frontend/src/layout/navigation-panel.tsx": {
+    "summary": "`NavigationPanel` is a width-controlled side nav container with optional left/right pointer handles used to build resizable panels."
+  },
+  "frontend/src/lib/api-init.ts": {
+    "summary": "Initializes the generated OpenAPI client at import time by setting its baseUrl to VITE_API_BASE_URL (default http://localhost:3001) and re-exports the client."
+  },
+  "frontend/src/lib/chat-types.ts": {
+    "summary": "Shared chat/SSE TypeScript types: ChatMessage with role/usage/branch metadata, SseMessageChunk/SseEvent shapes, and the StreamEvent envelope that is manually kept in sync with the backend stream-bus."
+  },
+  "frontend/src/lib/plugins/loader.ts": {
+    "summary": "Maps plugin UI capabilities to statically bundled modules for `PluginHostProvider`: sticky-notes leftBar/footerBar entries and the mermaid-renderer toolUi module, keyed as `<pluginId>::<capabilityKey>::<exportName>`."
+  },
+  "frontend/src/lib/stream.ts": {
+    "summary": "Hand-written (non-generated) backend transport helpers: API_BASE_URL, fetchMessages backfill, startRun, restartFromCheckpoint, switchBranch, cancelRun, and connectStream which parses the global SSE firehose frames into StreamEvent objects."
+  },
+  "frontend/src/lib/ui-types.ts": {
+    "summary": "UI-only type aliases derived from generated API types: `LayerSource` (local/global) and `ProviderType` from ProviderSummary, kept out of the OpenAPI-generated client."
+  },
+  "frontend/src/main.tsx": {
+    "summary": "App entry point: creates the TanStack Router and QueryClient then renders ActiveWorkdirProvider, PluginHostProvider (with plugin loaders), and RouterProvider inside StrictMode; also imports index.css and api-init."
+  },
+  "frontend/src/routeTree.gen.ts": {
+    "summary": "Auto-generated by the TanStack Router plugin: builds the typed route tree from src/routes (root, index, /u, /u/chat, /u/workspace, /u/settings, /u/$id) and should never be edited manually."
+  },
+  "frontend/src/store/chat-session-store.ts": {
+    "summary": "Zustand store for per-session chat state: merges SSE StreamEvents into messages with per-run seq dedup, token-usage summation, tool-call handling, status transitions, optimistic human appends, and history backfill; also exports sessionTracker and"
+  },
+  "agent/src/base/.libs/checkpointer.ts": {
+    "summary": "SQLite-backed LangGraph checkpointer: opens data/shared.db at the repo root (override with SQLITE_CHECKPOINT_PATH) with WAL and foreign keys enabled, and exports the checkpointer singleton used by graph.ts to persist agent thread state across"
+  },
+  "agent/src/base/.libs/configuration.ts": {
+    "summary": "Defines the LangGraph ConfigurationAnnotation (userId, systemPrompt, agentName, provider name/url, apiKey, modelName, allowedTools, deniedTools) and ensureConfiguration, which normalises configurable values with project defaults such as agent semar"
+  },
+  "agent/src/base/.libs/prompts.ts": {
+    "summary": "Exports the default SYSTEM_PROMPT template containing the {user_info} and {time} placeholders used as the fallback system prompt for the agent."
+  },
+  "agent/src/base/.libs/state.ts": {
+    "summary": "Defines the base graph state schema GraphAnnotation, currently a single messages channel using LangGraph MessagesValue."
+  },
+  "agent/src/base/.libs/utils.ts": {
+    "summary": "Shared node/tool helpers: getStoreFromConfigOrThrow validates that a LangGraph store is present in the runnable config, and splitModelAndProvider parses provider:model strings."
+  },
+  "agent/src/base/edges/route-mem.ts": {
+    "summary": "Conditional edge for the base agent graph: routeMessage inspects the last AIMessage and routes to call_tool when tool calls are present, otherwise to END."
+  },
+  "agent/src/base/graph.ts": {
+    "summary": "LangGraph state graph definition for the base agent: wires the call_model and call_tool nodes with the routeMessage conditional edge and compiles the graph with the SQLite checkpointer as MemoryAgent."
+  },
+  "agent/src/base/nodes/call-llm.test.ts": {
+    "summary": "Node test suite for callModel covering an end-to-end invocation against a mock OpenAI-compatible HTTP server (auth header, model, system/user messages) plus ensureConfiguration defaults and snake_case/camelCase override mapping."
+  },
+  "agent/src/base/nodes/call-llm.ts": {
+    "summary": "The callModel graph node: fetches the user's stored memories, injects them into the system prompt, builds a ChatOpenAI client from the resolved configuration, binds the runtime tools and returns the assistant message."
+  },
+  "agent/src/base/nodes/call-tool.ts": {
+    "summary": "The callTool graph node: builds the runtime tool set and delegates execution to a LangGraph prebuilt ToolNode with handleToolErrors enabled."
+  },
+  "agent/src/base/tools/_lib.ts": {
+    "summary": "Shared plumbing for the custom sandboxed tools: default byte/timeout/row/file limits, a dependency-free JSON-line tool logger, truncation helpers that mark omitted bytes explicitly, the withToolLog timing wrapper and toolError message formatting."
+  },
+  "agent/src/base/tools/file-tools.ts": {
+    "summary": "Sandboxed file toolkit (FileTools class and createFileTools) replacing the sunset community FileManagementToolkit: read_file, write_file, list_directory and delete_file with absolute-root validation, symlink-canonicalised containment checks, size"
+  },
+  "agent/src/base/tools/http-tools.ts": {
+    "summary": "The http_fetch tool (createHttpTools) replacing the community RequestsToolkit: allows only http/https, enforces a host whitelist, DNS-resolves hosts and blocks private/loopback/link-local/CGNAT addresses (SSRF guard), filters LLM-supplied headers,"
+  },
+  "agent/src/base/tools/index.ts": {
+    "summary": "Aggregator for the custom sandboxed tools: filterTools applies allow/deny name rules and getAllTools/getAllToolsAsync compose the optional shell tool plus required file, http and sql toolkits with the always-included upsert_memory tool; also"
+  },
+  "agent/src/base/tools/mcp-client.ts": {
+    "summary": "Lazily constructs a MultiServerMCPClient for the backend /mcp endpoint (BACKEND_MCP_URL, default http://localhost:3001/mcp) and exposes loadSessionManagerTools to fetch the remote session-manager tools."
+  },
+  "agent/src/base/tools/runtime.ts": {
+    "summary": "Builds the tool set for a graph invocation: buildRuntimeTools calls getAllToolsAsync with a default sandbox config and applies the allow/deny lists from the runtime configuration."
+  },
+  "agent/src/base/tools/shell-tool.ts": {
+    "summary": "The shell tool (createShellTool): a shell-free restricted command runner that tokenizes input into argv, rejects shell metacharacters such as ;, &&, |, $(), backticks and redirects, enforces a command whitelist/cwd/timeout and returns stdout, stderr"
+  },
+  "agent/src/base/tools/sql-tools.ts": {
+    "summary": "Read-only SQLite tools (createSqlTools) built on the built-in node:sqlite driver: list_tables, describe_table and run_query with SELECT/WITH-only checks, blocked write/DDL keyword filtering, stacked-statement rejection, auto-LIMIT and truncation,"
+  },
+  "agent/src/base/tools/upsert-mem.ts": {
+    "summary": "The upsert_memory tool: writes or updates a user memory in the LangGraph store namespace [memories, userId], reading store and configuration from ToolRuntime so a single instance can be reused by ToolNode."
+  },
+  "bin/puna.mjs": {
+    "summary": "Executable entry point for the puna CLI: dispatches the init and serve subcommands to src/init.js and src/serve.js and prints usage help for -h/--help or unknown commands."
+  },
+  "dev.sh": {
+    "summary": "Development launcher that runs the backend and frontend via bun and the agent via npm concurrently with colour-prefixed, line-buffered output, auto-restarts crashed services and kills all children on Ctrl-C/exit."
+  },
+  "install.sh": {
+    "summary": "Repo installer: runs bun install at the root for packages/* plus backend and frontend, then standalone npm install inside agent/ for the native better-sqlite3 binding, supporting --skip-if-installed and --force and logging to .puna/install-*.log."
+  },
+  "src/init.js": {
+    "summary": "Implementation of puna init: bootstraps the global config at ~/.config/.puna with bundled agent templates (semar, cepot, dawala, gareng) and skill templates (create-agent, create-skill, planning), then creates or refreshes a project-local .puna"
+  },
+  "src/serve.js": {
+    "summary": "Implementation of puna serve: finds the nearest .puna workspace by walking up from cwd, loads and validates its config, scans plans and the layered local/global agents and skills, prints a context banner, and spawns the backend/agent/frontend dev"
+  },
+  "src/ulid.js": {
+    "summary": "Minimal dependency-free ULID generator (Crockford base32, 10-char timestamp plus 16-char randomness) whose workspaceId() helper produces the ws_ prefixed ids stored in .puna/config.json."
+  },
+  "packages/cli/bin/puna-plugin.mjs": {
+    "summary": "Executable entrypoint for the puna-plugin CLI: dynamically imports ../src/index.js and prints the CLI version; currently a Fase 0 stub whose real commands (plugin create/dev/build) land in Fase 7."
+  },
+  "packages/cli/src/index.ts": {
+    "summary": "@puna/cli plugin-authoring CLI package root: documents the planned `puna plugin create|dev|build` commands and exports CLI_VERSION; body is a stub until Fase 7."
+  },
+  "packages/sdk-agent/src/index.ts": {
+    "summary": "@puna/sdk-agent stub declaring the planned withPluginHooks lifecycle bridge for LangGraph nodes consumed by agent/src/base/; only exports SDK_AGENT_VERSION until Fase 5."
+  },
+  "packages/sdk-backend/src/index.ts": {
+    "summary": "@puna/sdk-backend stub declaring the planned PluginHost, plugin scanner and routes consumed by backend/src/modules/plugins/; only exports SDK_BACKEND_VERSION until later phases."
+  },
+  "packages/sdk-frontend/src/badge.tsx": {
+    "summary": "PluginSourceBadge React component: small inline tag showing a plugin's origin layer (workspace-local/workspace-global/system-global) in layer-specific colors with an optional muted kind suffix; exports PluginSourceBadge and PluginSourceBadgeProps."
+  },
+  "packages/sdk-frontend/src/host.tsx": {
+    "summary": "Core frontend plugin host: PluginHostProvider owns registry state and a loader-result component cache, LoadedPluginComponent lazily renders a plugin slot, and hooks (usePluginRegistry, usePluginLeftBarItems, usePluginFooterBarItems,"
+  },
+  "packages/sdk-frontend/src/index.ts": {
+    "summary": "Barrel entry for @puna/sdk-frontend: re-exports registry, loader, slots, badge and host modules, re-exports shared plugin types (manifest/summary/source/kind/capabilities) and chat/tool UI types, and exposes SDK_FRONTEND_VERSION."
+  },
+  "packages/sdk-frontend/src/loader.ts": {
+    "summary": "UI module loader contract: defines PluginComponentProps, PluginComponentType, PluginModule, PluginLoader/Loaders types and the loaderKey helper that formats keys as <pluginId>::<capabilityKey>::<exportName> (empty export name = default export)."
+  },
+  "packages/sdk-frontend/src/registry.ts": {
+    "summary": "Registry client that fetches GET /api/plugins for a configDir then hydrates each summary with its manifest capabilities via parallel best-effort detail fetches (Promise.allSettled); exports createRegistryClient, RegistryState, EMPTY_REGISTRY,"
+  },
+  "packages/sdk-frontend/src/slots.tsx": {
+    "summary": "Per-slot React error boundary helpers: PluginErrorBoundary catches plugin render crashes, logs attribution (pluginId + capability) and renders fallback/null, while PluginSlot is a convenience pass-through wrapper ensuring a bad plugin degrades"
+  },
+  "packages/sdk-shared/src/index.ts": {
+    "summary": "Barrel entry for @puna/sdk-shared re-exporting the source and manifest modules, serving as the single source of truth for plugin schemas/types shared by backend parsing and frontend typing."
+  },
+  "packages/sdk-shared/src/manifest.test.ts": {
+    "summary": "Bun test suite for the plugin manifest schemas: covers minimal/full manifest parsing, strict rejection of unknown keys, semver validation, safe relative entry paths (no traversal, absolute, drive-letter or NUL paths), graph id/export rules, tools"
+  },
+  "packages/sdk-shared/src/manifest.ts": {
+    "summary": "Canonical Zod schemas for plugin.json parsing: PluginManifest, PluginCapabilities (leftBar, footerBar, chatRenderers, toolUi, backendHooks, tools, graphs), PluginPermissions/PluginShellPermission, PluginKind, PluginSummary, SEMVER_RE and the"
+  },
+  "packages/sdk-shared/src/source.ts": {
+    "summary": "Defines the PluginSource zod enum classifying where a discovered plugin directory came from (workspace-local, workspace-global, system-global), with local-wins conflict policy documented for discovery."
+  },
+  "templates/plugin/logging-hook/backend/index.ts": {
+    "summary": "Logging-hook plugin template backend stub exporting no-op beforeNode/afterNode lifecycle hooks (as named and default exports); real hook logic is slated for Fase 5."
+  },
+  "templates/plugin/logging-hook/ui/.keep.ts": {
+    "summary": "Placeholder .keep.ts file for the logging-hook plugin template marking that it is agent-side only with no UI surface; exports an empty object and nothing else."
+  },
+  "templates/plugin/mermaid-renderer/backend/index.ts": {
+    "summary": "Placeholder backend module for the UI-only mermaid-renderer plugin template; exports an empty default object for symmetry since capabilities.backendHooks is not declared."
+  },
+  "templates/plugin/mermaid-renderer/ui/index.tsx": {
+    "summary": "Mermaid tool-UI plugin template: exports a toolUi object keyed by tool name whose MermaidDiagram component renders mermaid source extracted from tool args with copy-to-clipboard and optional result display; SDK prop types are inlined so the file"
+  },
+  "templates/plugin/research-agent/backend/index.ts": {
+    "summary": "Placeholder backend module for the graph-only research-agent plugin template; exports nothing because the plugin's entrypoint is its graphs/ directory rather than a backend module."
+  },
+  "templates/plugin/research-agent/graphs/research.ts": {
+    "summary": "Research-agent graph template exporting a stub researchGraph object with empty nodes/edges (default export) as a placeholder for the real LangGraph subgraph planned for Fase 6."
+  },
+  "templates/plugin/research-agent/ui/.keep.ts": {
+    "summary": "Placeholder .keep.ts file for the research-agent plugin template marking that this graph plugin has no UI surface; exports an empty object."
+  },
+  "templates/plugin/sticky-notes/backend/index.ts": {
+    "summary": "Sticky-notes plugin backend template stub exporting a no-op StickyNotesBackend function placeholder; the full backend implementation is planned for Fase 2."
+  },
+  "templates/plugin/sticky-notes/ui/index.tsx": {
+    "summary": "Sticky-notes UI plugin template: exports a left-bar StickyNotesEntry panel (localStorage-persisted notes with add/delete) and a StickyNotesCounter footer widget that polls the note count; default export is the panel, intended for leftBar and"
+  },
+  "templates/skills/create-agent/scripts/scaffold.sh": {
+    "summary": "create-agent skill scaffold script: creates .puna/agents/<name>/ with a conf.json (name, role, temperature, tools allow/deny, description) and a prompt.md template, honors PUNA_TARGET/PUNA_AGENT_ROLE/PUNA_AGENT_DESCRIPTION env vars, and refuses to"
+  },
+  "templates/skills/create-skill/scripts/scaffold.sh": {
+    "summary": "create-skill skill scaffold script: creates .puna/skills/<name>/ with a desc.md stub and an executable scripts/example.sh starting point, honors PUNA_TARGET, and refuses to overwrite an existing target."
+  },
+  "templates/skills/planning/scripts/advance.sh": {
+    "summary": "Planning skill helper that appends a UTC-timestamped progress entry to .puna/docs/plan/<name>.progress.md, creating the plan directory if needed; configurable via PUNA_DIR."
+  },
+  "templates/skills/planning/scripts/create.sh": {
+    "summary": "Planning skill helper that creates a new .puna/docs/plan/<name>.md plan file from a Goal/Steps/Notes markdown template, refusing to overwrite an existing plan; configurable via PUNA_DIR."
+  },
+  "templates/skills/planning/scripts/list.sh": {
+    "summary": "Planning skill helper that lists all plan names under .puna/docs/plan/ by stripping .md/.progress.md suffixes, de-duplicating and sorting; prints a notice and exits 0 when no plan directory exists."
+  }
+}
