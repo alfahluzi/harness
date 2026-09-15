@@ -7,3 +7,4 @@
 
 export * from "./source";
 export * from "./manifest";
+export * from "./graph-key";

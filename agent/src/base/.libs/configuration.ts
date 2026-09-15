@@ -46,6 +46,14 @@ export const ConfigurationAnnotation = Annotation.Root({
 		reducer: (_, v) => v,
 		default: () => [],
 	}),
+	configDir: Annotation<string>({
+		reducer: (_, v) => v,
+		default: () => "",
+	}),
+	workspaceId: Annotation<string>({
+		reducer: (_, v) => v,
+		default: () => "",
+	}),
 });
 
 export function ensureConfiguration(config: LangGraphRunnableConfig) {
@@ -60,5 +68,7 @@ export function ensureConfiguration(config: LangGraphRunnableConfig) {
 		modelName: c?.model_name ?? c?.modelName ?? DEFAULT_MODEL_NAME,
 		allowedTools: (c?.allowed_tools ?? c?.allowedTools ?? []) as string[],
 		deniedTools: (c?.denied_tools ?? c?.deniedTools ?? []) as string[],
+		configDir: c?.config_dir ?? c?.configDir ?? "",
+		workspaceId: c?.workspace_id ?? c?.workspaceId ?? "",
 	};
 }

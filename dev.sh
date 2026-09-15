@@ -53,6 +53,18 @@ run_one() {
   local runner="${RUNNER[$d]}"
   local prefix="${color}[$d]${c_off}"
   while true; do
+    # Fase 6 (F6-T2): regenerate agent/langgraph.json from installed plugin
+    # graphs before every LangGraph server (re)start. Must run from agent/ so
+    # `node --import tsx` + the relative sdk-shared import resolve.
+    if [[ "$d" == "agent" ]]; then
+      local link_rc=0
+      ( cd "$ROOT/agent" && node --import tsx scripts/link-plugin-graphs.ts ) 2>&1 \
+        | stdbuf -oL awk -v p="$prefix" '{ print p" "$0; fflush() }'
+      link_rc=${PIPESTATUS[0]}
+      if (( link_rc != 0 )); then
+        echo "${prefix}${c_ylw}link-plugin-graphs failed; starting agent anyway${c_off}"
+      fi
+    fi
     (
       cd "$ROOT/$d" || exit 1
       stdbuf -oL -eL "$runner" run dev 2>&1 \

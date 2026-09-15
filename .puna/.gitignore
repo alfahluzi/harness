@@ -2,3 +2,4 @@ config.local.json
 cache/
 *.log
 config.json
+plugins/

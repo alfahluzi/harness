@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { CapabilityEntry, PluginManifest, PluginSource, PluginSummary } from "@puna/sdk-shared";
 import { InvalidWorkspaceError } from "../../global/workspace-context";
+import { getPluginHostForWorkspace } from "./host";
 import { PluginService, PluginNotFoundError } from "./service";
 
 const pluginService = new PluginService();
@@ -13,6 +14,23 @@ const ConfigDirQuery = z.object({
 
 const PluginIdParam = z.object({
 	id: z.string().min(1),
+});
+
+/**
+ * Hook query: `configDir` is canonical, `workspace` is an accepted alias.
+ * Presence is validated in the handler because `.refine()` is not supported
+ * on `request.query` schemas by `zod-openapi`.
+ */
+const PluginHooksQuery = z.object({
+	configDir: z.string().min(1).optional(),
+	workspace: z.string().min(1).optional(),
+});
+
+const PluginHooksRunBody = z.object({
+	phase: z.enum(["beforeNode", "afterNode"]),
+	node: z.string().min(1),
+	state: z.record(z.string(), z.unknown()).optional(),
+	config: z.record(z.string(), z.unknown()).optional(),
 });
 
 const ErrorResponse = z.object({ error: z.string() }).openapi("Error");
@@ -36,6 +54,30 @@ const PluginDetailResponseSchema = z
 		resolvedDir: z.string().min(1),
 	})
 	.openapi("PluginDetailResponse");
+
+/** Fase 5: `GET /plugins/hooks` envelope (lifecycle hook descriptors). */
+const PluginHooksResponse = z
+	.object({
+		configDir: z.string(),
+		timeoutMs: z.number(),
+		plugins: z.array(
+			z.object({
+				id: z.string(),
+				beforeNode: z.boolean(),
+				afterNode: z.boolean(),
+			}),
+		),
+	})
+	.openapi("PluginHooksResponse");
+
+/** Fase 5: `POST /plugins/hooks` envelope (aggregated run result). */
+const PluginHooksRunResponse = z
+	.object({
+		patch: z.record(z.string(), z.unknown()).nullable(),
+		invoked: z.number(),
+		dropped: z.number(),
+	})
+	.openapi("PluginHooksRunResponse");
 
 /**
  * In-memory UI bundle cache, keyed by `<configDir>\0<id>\0<entry>`.
@@ -72,6 +114,45 @@ const listRoute = createRoute({
 		},
 		400: {
 			description: "Invalid workspace",
+			content: { "application/json": { schema: ErrorResponse } },
+		},
+	},
+	tags: ["plugins"],
+});
+
+const hooksRoute = createRoute({
+	method: "get",
+	path: "/plugins/hooks",
+	request: { query: PluginHooksQuery },
+	responses: {
+		200: {
+			description: "Plugins declaring node lifecycle hooks for the workspace",
+			content: { "application/json": { schema: PluginHooksResponse } },
+		},
+		400: {
+			description: "Missing configDir (or workspace) query, or invalid workspace",
+			content: { "application/json": { schema: ErrorResponse } },
+		},
+	},
+	tags: ["plugins"],
+});
+
+const hooksRunRoute = createRoute({
+	method: "post",
+	path: "/plugins/hooks",
+	request: {
+		query: PluginHooksQuery,
+		body: {
+			content: { "application/json": { schema: PluginHooksRunBody } },
+		},
+	},
+	responses: {
+		200: {
+			description: "Merged afterNode patch plus invoked/dropped hook counts",
+			content: { "application/json": { schema: PluginHooksRunResponse } },
+		},
+		400: {
+			description: "Missing configDir (or workspace) query, or invalid workspace",
 			content: { "application/json": { schema: ErrorResponse } },
 		},
 	},
@@ -134,6 +215,40 @@ app.openapi(listRoute, async (c) => {
 	const { configDir } = c.req.valid("query");
 	try {
 		const result = await pluginService.list(configDir);
+		return c.json(result, 200);
+	} catch (e) {
+		if (e instanceof InvalidWorkspaceError) return c.json({ error: e.message }, 400);
+		throw e;
+	}
+});
+
+app.openapi(hooksRoute, async (c) => {
+	const query = c.req.valid("query");
+	// `workspace` is an accepted alias for the strategy name; presence is
+	// checked manually because `.refine()` is unsupported on query schemas.
+	const configDir = query.configDir ?? query.workspace;
+	if (!configDir) {
+		return c.json({ error: "configDir (or workspace) query is required" }, 400);
+	}
+	try {
+		const host = await getPluginHostForWorkspace(configDir);
+		return c.json({ configDir, timeoutMs: 5000, plugins: host.getLifecycleHooks() }, 200);
+	} catch (e) {
+		if (e instanceof InvalidWorkspaceError) return c.json({ error: e.message }, 400);
+		throw e;
+	}
+});
+
+app.openapi(hooksRunRoute, async (c) => {
+	const query = c.req.valid("query");
+	const configDir = query.configDir ?? query.workspace;
+	if (!configDir) {
+		return c.json({ error: "configDir (or workspace) query is required" }, 400);
+	}
+	const { phase, node, state, config } = c.req.valid("json");
+	try {
+		const host = await getPluginHostForWorkspace(configDir);
+		const result = await host.runNodeHook(phase, node, state ?? {}, config ?? {});
 		return c.json(result, 200);
 	} catch (e) {
 		if (e instanceof InvalidWorkspaceError) return c.json({ error: e.message }, 400);

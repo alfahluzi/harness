@@ -3,8 +3,9 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { ensureConfiguration } from "../.libs/configuration.js";
 import type { GraphAnnotation } from "../.libs/state.js";
 import { buildRuntimeTools } from "../tools/runtime.js";
+import { withPluginHooks } from "../.libs/plugin-bridge.js";
 
-export async function callTool(
+async function callToolImpl(
 	state: typeof GraphAnnotation.State,
 	config: LangGraphRunnableConfig,
 ) {
@@ -16,3 +17,5 @@ export async function callTool(
 	});
 	return node.invoke(state, config);
 }
+
+export const callTool = withPluginHooks("call_tool", callToolImpl);

@@ -24,6 +24,13 @@ export interface AgentRuntimeConfig {
 		system_prompt: string;
 		allowed_tools: string[];
 		denied_tools: string[];
+		/**
+		 * Workspace plumbing for plugin node-lifecycle hooks (Fase 5): the agent
+		 * sub-process calls `GET/POST /api/plugins/hooks?configDir=...` and needs
+		 * to know which workspace it belongs to.
+		 */
+		config_dir: string;
+		workspace_id: string;
 	};
 }
 
@@ -150,6 +157,8 @@ export async function resolveAgentRuntimeConfig(
 			system_prompt: prompt,
 			allowed_tools: conf.tools?.allow ?? [],
 			denied_tools: conf.tools?.deny ?? [],
+			config_dir: configDir,
+			workspace_id: ctx.id,
 		},
 	};
 }

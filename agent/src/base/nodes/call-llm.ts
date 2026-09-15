@@ -6,8 +6,9 @@ import { GraphAnnotation } from "../.libs/state.js";
 import { buildRuntimeTools } from "../tools/runtime.js";
 import { getStoreFromConfigOrThrow } from "../.libs/utils.js";
 import { ChatOpenAI } from "@langchain/openai";
+import { withPluginHooks } from "../.libs/plugin-bridge.js";
 
-export async function callModel(
+async function callModelImpl(
 	state: typeof GraphAnnotation.State,
 	config: LangGraphRunnableConfig,
 ): Promise<{ messages: BaseMessage[] }> {
@@ -49,3 +50,5 @@ export async function callModel(
 
 	return { messages: [result] };
 }
+
+export const callModel = withPluginHooks("call_model", callModelImpl);

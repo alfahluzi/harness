@@ -1,23 +1,17 @@
 {
-  "id": "research-agent",
-  "name": "Research Agent",
-  "version": "0.1.0",
-  "kind": "graph",
-  "description": "Custom LangGraph research subgraph contributed via Fase 6 manifest.graphs[].",
-  "entry": {
-    "backend": "./backend/index.ts"
-  },
-  "graphs": [
-    {
-      "name": "research",
-      "path": "./graphs/research.ts",
-      "alias": "researcher"
-    }
-  ],
-  "permissions": {
-    "net": ["https://*"]
-  },
-  "backend": {
-    "entry": "./backend/index.ts"
-  }
+	"$schema": "https://puna.dev/schemas/plugin.v1.json",
+	"id": "research-agent",
+	"name": "Research Agent",
+	"version": "0.1.0",
+	"description": "Custom LangGraph research subgraph contributed via capabilities.graphs[] (Fase 6).",
+	"author": "Puna",
+	"license": "MIT",
+	"engines": { "puna": ">=0.1.0" },
+	"capabilities": {
+		"graphs": [
+			{ "id": "research", "entry": "./graphs/research.ts", "export": "graph" },
+			{ "id": "summarize", "entry": "./graphs/summarize.ts", "export": "graph", "alias": "summary" }
+		]
+	},
+	"permissions": { "net": { "hosts": ["api.openai.com"] } }
 }

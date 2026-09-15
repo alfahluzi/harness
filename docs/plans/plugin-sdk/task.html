@@ -1,6 +1,86 @@
-{
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>puna plugin SDK — build log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'monospace'],
+      },
+    },
+  },
+}
+</script>
+<style>
+  ::-webkit-scrollbar { height: 10px; width: 10px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+<div class="max-w-[1600px] mx-auto w-full px-4 sm:px-6 py-8 flex-1 flex flex-col min-w-0">
+
+  <header>
+    <div class="font-mono text-xs uppercase tracking-widest text-slate-500 mb-2">puna <span class="text-indigo-400">·</span> plugin-sdk <span class="text-indigo-400">·</span> build log</div>
+    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight mb-2">SDK Plugin Rollout</h1>
+    <p class="text-slate-400 text-sm max-w-2xl">Progres implementasi dari scaffolding sampai publish — 10 fase, dilacak otomatis dari setiap perubahan.</p>
+
+    <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 p-1.5 bg-slate-900 rounded-xl border border-slate-800">
+      <div class="bg-slate-950/60 rounded-lg p-4">
+        <div class="text-2xl font-semibold font-mono" id="stat-total">—</div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Total task</div>
+      </div>
+      <div class="bg-slate-950/60 rounded-lg p-4">
+        <div class="text-2xl font-semibold font-mono text-emerald-400" id="stat-done">—</div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Selesai</div>
+      </div>
+      <div class="bg-slate-950/60 rounded-lg p-4">
+        <div class="text-2xl font-semibold font-mono text-amber-400" id="stat-todo">—</div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Belum</div>
+      </div>
+      <div class="bg-slate-950/60 rounded-lg p-4">
+        <div class="text-2xl font-semibold font-mono text-indigo-400" id="stat-pct">—</div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Progres</div>
+      </div>
+    </div>
+
+    <div class="mt-4 h-2 bg-slate-800 rounded-full overflow-hidden">
+      <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" id="overall-fill" style="width:0%"></div>
+    </div>
+  </header>
+
+  <div class="mt-6 flex flex-wrap items-center gap-2">
+    <span class="text-[10px] uppercase tracking-wider text-slate-500 mr-1">Filter</span>
+    <button class="fbtn active px-3 py-1.5 rounded-full text-xs font-mono border transition-colors bg-indigo-600 border-indigo-600 text-white" data-filter="all">Semua fase</button>
+    <button class="fbtn px-3 py-1.5 rounded-full text-xs font-mono border border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200 transition-colors" data-filter="open">Belum kelar</button>
+    <button class="fbtn px-3 py-1.5 rounded-full text-xs font-mono border border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200 transition-colors" data-filter="complete">Sudah kelar</button>
+  </div>
+
+  <div class="mt-5 -mx-4 px-4 sm:-mx-6 sm:px-6 overflow-x-auto pb-6">
+    <div id="board" class="flex gap-5 items-stretch min-w-max"></div>
+  </div>
+
+  <footer class="mt-auto pt-5 border-t border-slate-800 text-xs font-mono text-slate-500 flex justify-between flex-wrap gap-2">
+    <span id="foot-created"></span>
+    <span id="foot-updated"></span>
+  </footer>
+
+</div>
+
+<script>
+const DATA = {
   "created_at": "2026-09-15T16:03:45.026Z",
-  "updated_at": "2026-09-15T17:07:43.580Z",
+  "updated_at": "2026-09-15T16:48:16.956Z",
   "phases": [
     {
       "id": 1,
@@ -442,49 +522,22 @@
           "id": 1,
           "title": "manifest graphs[] resolver (link-plugin-graphs.ts)",
           "detail": "agent/scripts/link-plugin-graphs.ts: baca manifest graphs[] → symlink agent/.plugins/<id>/graph.ts → rewrite agent/langgraph.json",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:53:20.168Z",
-              "note": "agent/scripts/link-plugin-graphs.ts: 3-layer fs scan + dir symlink .plugins/<pluginId> + langgraph.json rewrite. 6/6 tests pass."
-            },
-            {
-              "at": "2026-09-15T17:07:43.220Z",
-              "note": "Re-verify e2e (2026-09-16, linux): plugin nyata di .puna/plugins/research-agent -> linker registered 2 graphs, langgraph.json ter-regenerate (graph + research-agent.research + research-agent.summary), idempotent (md5 sama 2x run), stale-link cleanup OK. 6/6 unit test pass."
-            }
-          ]
+          "status": "todo",
+          "progress": []
         },
         {
           "id": 2,
           "title": "wire to dev.sh",
           "detail": "dev.sh panggil link-plugin-graphs.ts sebelum start LangGraph server (regenerate saat plugin di-enable)",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:53:20.550Z",
-              "note": "dev.sh runs linker before npm run dev each agent restart; uses PIPESTATUS[0]; bash -n OK."
-            },
-            {
-              "at": "2026-09-15T17:07:43.350Z",
-              "note": "Re-verify: bash -n dev.sh OK; linker dipanggil sebelum start agent leg (PIPESTATUS[0] guard) dan sukses dijalankan manual dari agent/ (rc=0)."
-            }
-          ]
+          "status": "todo",
+          "progress": []
         },
         {
           "id": 3,
           "title": "sample plugin research-agent graph",
           "detail": "plugins/research-agent: manifest graphs[] (entry + export) + module graph",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:53:20.981Z",
-              "note": "templates/plugin/research-agent: valid manifest with 2 graphs (research + summarize alias), real StateGraph modules. Manifest safeParse OK; e2e linker output shows both keys."
-            },
-            {
-              "at": "2026-09-15T17:07:43.469Z",
-              "note": "Re-verify e2e: langgraphjs dev (port 2024) register graph 'graph', 'research-agent.research', 'research-agent.summary'; /assistants/search mengembalikan ketiganya; /runs/wait pada research-agent.summary -> {summary:'alpha\\nbeta'} dan research-agent.research -> notes plan+collected. Sample terbukti loadable+executable."
-            }
-          ]
+          "status": "todo",
+          "progress": []
         },
         {
           "id": 4,
@@ -495,10 +548,6 @@
             {
               "at": "2026-09-15T16:48:16.825Z",
               "note": "host.getGraphs() returns namespaced PluginGraphDescriptor[] via resolveGraphKey. 4 tests pass."
-            },
-            {
-              "at": "2026-09-15T17:07:43.580Z",
-              "note": "Re-verify: host.getGraphs() namespaced descriptor via resolveGraphKey; bun test backend/src/modules/plugins 45/45 pass (termasuk 4 test graph namespace)."
             }
           ]
         }
@@ -616,3 +665,131 @@
     }
   ]
 }
+;
+
+function fmtTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleString('id-ID', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+
+function render(){
+  const phases = DATA.phases;
+  let total=0, done=0;
+
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  phases.forEach(phase => {
+    const tasks = phase.tasks;
+    const phaseDone = tasks.filter(t => t.status === 'completed').length;
+    const phaseTotal = tasks.length;
+    total += phaseTotal;
+    done += phaseDone;
+
+    const state = phaseDone === phaseTotal ? 'complete' : (phaseDone === 0 ? 'empty' : 'partial');
+    const pct = Math.round((phaseDone / phaseTotal) * 100);
+    const title = phase.goal.replace(/^Fase\s*\d+\s*—\s*/i, '');
+
+    const col = document.createElement('article');
+    col.className = 'phase w-80 shrink-0 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg flex flex-col';
+    col.dataset.state = state;
+    col.dataset.status = state;
+
+    col.innerHTML = `
+      <div class="sticky top-0 z-10 p-4 bg-slate-900/95 backdrop-blur border-b border-slate-800 rounded-t-2xl">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="font-mono text-[10px] uppercase tracking-wider text-indigo-400 mb-0.5">FASE ${String(phase.id).padStart(2,'0')}</div>
+            <h2 class="text-sm font-semibold text-slate-100 leading-tight">${escapeHtml(title)}</h2>
+          </div>
+          <div class="shrink-0 mt-0.5">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono ${state === 'complete' ? 'bg-emerald-500/15 text-emerald-400' : (state === 'empty' ? 'bg-slate-800 text-slate-500' : 'bg-amber-500/15 text-amber-400')}">
+              ${state === 'complete' ? '✓' : (state === 'empty' ? '○' : '◐')}
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex justify-between text-[10px] font-mono text-slate-400 mb-1">
+            <span>${phaseDone}/${phaseTotal} task</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width:${pct}%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="p-3 space-y-3 flex-1">
+        ${tasks.map(t => renderTask(t, phase.id)).join('')}
+      </div>
+    `;
+
+    board.appendChild(col);
+  });
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-todo').textContent = total - done;
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('stat-pct').textContent = pct + '%';
+  document.getElementById('overall-fill').style.width = pct + '%';
+
+  document.getElementById('foot-created').textContent = 'dibuat ' + fmtTime(DATA.created_at);
+  document.getElementById('foot-updated').textContent = 'update terakhir ' + fmtTime(DATA.updated_at);
+}
+
+function renderTask(t, phaseId){
+  const isDone = t.status === 'completed';
+  const accent = isDone ? 'bg-emerald-500' : 'bg-amber-500';
+  const chip = isDone
+    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+  const timeline = (t.progress || []).map(p => `
+    <div class="flex gap-2 text-[11px] leading-snug">
+      <span class="shrink-0 font-mono text-emerald-400">${fmtTime(p.at)}</span>
+      <span class="text-slate-400">${escapeHtml(p.note)}</span>
+    </div>
+  `).join('');
+
+  return `
+    <div class="relative bg-slate-950 border border-slate-800 rounded-xl p-4 shadow-sm" data-status="${t.status}">
+      <div class="absolute left-0 top-4 bottom-4 w-1 rounded-r ${accent}"></div>
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <span class="font-mono text-[10px] uppercase tracking-wider text-slate-500">#F${String(phaseId).padStart(2,'0')}-T${String(t.id).padStart(2,'0')}</span>
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${chip}">${isDone ? 'done' : 'todo'}</span>
+      </div>
+      <h3 class="text-sm font-medium text-slate-100 leading-snug mb-1.5">${escapeHtml(t.title)}</h3>
+      <p class="text-xs font-mono text-slate-400 leading-relaxed mb-3">${escapeHtml(t.detail)}</p>
+      ${timeline ? `<div class="border-t border-slate-800/60 pt-2.5 space-y-2">${timeline}</div>` : ''}
+    </div>
+  `;
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+document.querySelectorAll('.fbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fbtn').forEach(b => {
+      b.classList.remove('active', 'bg-indigo-600', 'border-indigo-600', 'text-white');
+      b.classList.add('border-slate-700', 'text-slate-400');
+    });
+    btn.classList.add('active', 'bg-indigo-600', 'border-indigo-600', 'text-white');
+    btn.classList.remove('border-slate-700', 'text-slate-400');
+    const mode = btn.dataset.filter;
+    document.querySelectorAll('.phase').forEach(p => {
+      const state = p.dataset.state;
+      let show = true;
+      if (mode === 'open') show = state !== 'complete';
+      if (mode === 'complete') show = state === 'complete';
+      p.style.display = show ? '' : 'none';
+    });
+  });
+});
+
+render();
+</script>
+</body>
+</html>

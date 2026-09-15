@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "langgraphjs dev",
     "start": "langgraphjs dev",
-    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "test": "node --import tsx --test $(find src scripts -path '*/node_modules/*' -prune -o -name '*.test.ts' -print | tr '\\n' ' ')",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

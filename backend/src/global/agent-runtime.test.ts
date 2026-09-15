@@ -138,6 +138,9 @@ describe("resolveAgentRuntimeConfig", () => {
 		expect(cfg.configurable.api_key).toBe("sk-test-123");
 		expect(cfg.configurable.model_name).toBe("gpt-test");
 		expect(cfg.configurable.system_prompt).toBe("You are a coder.\nBe precise.");
+		// Fase 5: workspace plumbing for plugin node-lifecycle hooks.
+		expect(cfg.configurable.config_dir).toBe(configDir);
+		expect(cfg.configurable.workspace_id).toBe("ws-local");
 	});
 
 	test("global fallback provider resolves when only a global row exists", async () => {
