@@ -3,19 +3,24 @@
   "version": "0.1.0",
   "description": "Plugin SDK — shared Zod schemas, manifest types, source-layer enums.",
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.ts",
     "./manifest": "./src/manifest.ts",
     "./source": "./src/source.ts"
   },
   "files": [
-    "src"
+    "src",
+    "dist"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "rm -rf dist && bun run build:js && bun run build:types",
+    "build:js": "bun build ./src/index.ts ./src/manifest.ts ./src/source.ts ./src/graph-key.ts --outdir dist --target node --format esm --external zod",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "zod": "^4.5.4"

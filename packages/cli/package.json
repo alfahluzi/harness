@@ -21,10 +21,13 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "echo 'no tests yet' && exit 0"
+    "test": "bun test"
   },
   "dependencies": {
     "@puna/sdk-shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
   },
   "peerDependencies": {
     "bun-types": "*"

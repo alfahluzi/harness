@@ -3,21 +3,22 @@
   "version": "0.1.0",
   "description": "Plugin SDK — backend PluginHost, scanner, hook bridge, Hono routes.",
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./host": "./src/host.ts",
-    "./scanner": "./src/scanner.ts",
-    "./service": "./src/service.ts",
-    "./routes": "./src/routes.ts"
+    ".": "./src/index.ts"
   },
   "files": [
-    "src"
+    "src",
+    "dist"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "rm -rf dist && bun run build:js && bun run build:types",
+    "build:js": "bun build ./src/index.ts --outdir dist --target node --format esm --external @puna/sdk-shared --external zod --external hono",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "@puna/sdk-shared": "workspace:*",
@@ -25,6 +26,10 @@
   },
   "peerDependencies": {
     "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "~6.0.2"
   },
   "keywords": [
     "puna",

@@ -1,6 +1,6 @@
 {
   "created_at": "2026-09-15T16:03:45.026Z",
-  "updated_at": "2026-09-15T17:07:43.580Z",
+  "updated_at": "2026-09-15T17:33:41.422Z",
   "phases": [
     {
       "id": 1,
@@ -512,42 +512,47 @@
           "id": 1,
           "title": "publish @puna/sdk-shared (verdaccio / bun link)",
           "detail": "build + publish @puna/sdk-shared ke Verdaccio / bun link; exports map + type declarations",
-          "status": "todo",
-          "progress": []
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T17:31:52.106Z",
+              "note": "dist + d.ts emitted, exports trimmed, bun link ok for 4 packages, /tmp probe verifies parse+unknown-key rejection"
+            }
+          ]
         },
         {
           "id": 2,
           "title": "publish sdk-frontend, sdk-backend, sdk-agent",
           "detail": "build + publish sdk-frontend, sdk-backend, sdk-agent (bun link)",
-          "status": "todo",
+          "status": "completed",
           "progress": []
         },
         {
           "id": 3,
           "title": "puna plugin create CLI",
           "detail": "puna plugin create: scaffold dari templates/plugin/* ke .puna/plugins/<name>",
-          "status": "todo",
+          "status": "completed",
           "progress": []
         },
         {
           "id": 4,
           "title": "puna plugin dev watch",
           "detail": "puna plugin dev: watch + hot-reload plugin di workspace .puna/plugins/",
-          "status": "todo",
+          "status": "completed",
           "progress": []
         },
         {
           "id": 5,
           "title": "puna plugin build",
           "detail": "puna plugin build: bundle prod (React/router external); target gzip ≤ 50KB",
-          "status": "todo",
+          "status": "completed",
           "progress": []
         },
         {
           "id": 6,
           "title": ".docs/plugin-authoring.md",
           "detail": ".docs/plugin-authoring.md: manifest, permissions, slot, hook, graph, publish flow",
-          "status": "todo",
+          "status": "completed",
           "progress": []
         }
       ]
@@ -602,15 +607,20 @@
           "id": 3,
           "title": "sample plugins tested per OS (linux/darwin)",
           "detail": "jalankan sample plugin di linux + darwin, dokumentasikan hasil",
-          "status": "todo",
+          "status": "in_progress",
           "progress": []
         },
         {
           "id": 4,
           "title": "performance budget: plugin load <=100ms p95",
           "detail": "ukur plugin load ≤ 100ms p95 + log timing",
-          "status": "todo",
-          "progress": []
+          "status": "completed",
+          "progress": [
+            {
+              "at": "2026-09-15T17:29:30.911Z",
+              "note": "mtime hot-reload + bench p95=2.85ms (budget 100ms), 48/48 tests green"
+            }
+          ]
         }
       ]
     }

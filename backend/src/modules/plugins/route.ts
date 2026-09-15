@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { CapabilityEntry, PluginManifest, PluginSource, PluginSummary } from "@puna/sdk-shared";
@@ -82,12 +83,36 @@ const PluginHooksRunResponse = z
 /**
  * In-memory UI bundle cache, keyed by `<configDir>\0<id>\0<entry>`.
  *
- * Invalidation policy: entries live for the process lifetime — invalidation
- * happens only on backend restart. Dev-mode edits to a plugin's UI source are
- * therefore picked up by restarting the backend (F3-T6 scope; a watcher or
- * mtime check is out of scope for this task).
+ * Revalidation policy: each entry stores the bundle text plus the entry file's
+ * `mtimeMs` and byte `size` captured at build time. Every request stats the
+ * resolved entry: a matching stamp serves the cached bundle (`X-Plugin-Bundle-Cached: 1`),
+ * a changed/unreadable entry rebuilds and refreshes the entry (`: 0`). Dev-mode
+ * edits to a plugin's UI source are therefore picked up on the next request
+ * without a backend restart (hot-reload for `puna plugin dev`). Entries are
+ * never proactively evicted; a stale entry is overwritten in place.
  */
-const uiBundleCache = new Map<string, string>();
+interface UiBundleCacheEntry {
+	bundle: string;
+	mtimeMs: number;
+	size: number;
+}
+
+const uiBundleCache = new Map<string, UiBundleCacheEntry>();
+
+/**
+ * Stat the bundle entry for its cache stamp. Any fs error (missing file,
+ * permission race, transient EIO) yields `null` so callers treat the entry as
+ * stale and fall back to the normal `file.exists()` / build path — a stat
+ * failure must never surface as a 500 by itself.
+ */
+async function statEntry(absPath: string): Promise<{ mtimeMs: number; size: number } | null> {
+	try {
+		const info = await stat(absPath);
+		return { mtimeMs: info.mtimeMs, size: info.size };
+	} catch {
+		return null;
+	}
+}
 
 /** UI capability lookup order (Fase 3 wire-up surface first, then legacy). */
 const UI_CAPABILITY_ORDER = ["chatRenderers", "toolUi", "leftBar", "footerBar"] as const;
@@ -295,7 +320,16 @@ app.openapi(uiBundleRoute, async (c) => {
 
 	const cached = uiBundleCache.get(cacheKey);
 	if (cached !== undefined) {
-		return c.body(cached, 200, { "Content-Type": "text/javascript; charset=utf-8" });
+		const stamp = await statEntry(absPath);
+		if (stamp !== null && stamp.mtimeMs === cached.mtimeMs && stamp.size === cached.size) {
+			return c.body(cached.bundle, 200, {
+				"Content-Type": "text/javascript; charset=utf-8",
+				"X-Plugin-Bundle-Cached": "1",
+			});
+		}
+		// Source changed (or entry became unreadable): drop the stale entry and
+		// fall through to the regular exists/build path.
+		uiBundleCache.delete(cacheKey);
 	}
 
 	const file = Bun.file(absPath);
@@ -341,8 +375,15 @@ app.openapi(uiBundleRoute, async (c) => {
 		return c.json({ error: `ui bundle build failed: unsupported entry extension: ${relPath}` }, 500);
 	}
 
-	uiBundleCache.set(cacheKey, bundle);
-	return c.body(bundle, 200, { "Content-Type": "text/javascript; charset=utf-8" });
+	// Record the stamp used for later revalidation. A failed post-build stat
+	// (file deleted mid-build) still serves the bundle, just uncached.
+	const stamp = await statEntry(absPath);
+	if (stamp !== null) uiBundleCache.set(cacheKey, { bundle, ...stamp });
+
+	return c.body(bundle, 200, {
+		"Content-Type": "text/javascript; charset=utf-8",
+		"X-Plugin-Bundle-Cached": "0",
+	});
 });
 
 export { app as pluginRoutes };

@@ -64,6 +64,10 @@ tailwind.config = {
     <button class="fbtn active px-3 py-1.5 rounded-full text-xs font-mono border transition-colors bg-indigo-600 border-indigo-600 text-white" data-filter="all">Semua fase</button>
     <button class="fbtn px-3 py-1.5 rounded-full text-xs font-mono border border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200 transition-colors" data-filter="open">Belum kelar</button>
     <button class="fbtn px-3 py-1.5 rounded-full text-xs font-mono border border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200 transition-colors" data-filter="complete">Sudah kelar</button>
+    <div id="sync-status" class="ml-auto flex items-center gap-2 text-[10px] font-mono text-slate-500">
+      <span class="w-2 h-2 rounded-full bg-slate-600"></span>
+      <span>menunggu data…</span>
+    </div>
   </div>
 
   <div class="mt-5 -mx-4 px-4 sm:-mx-6 sm:px-6 overflow-x-auto pb-6">
@@ -78,605 +82,123 @@ tailwind.config = {
 </div>
 
 <script>
-const DATA = {
-  "created_at": "2026-09-15T16:03:45.026Z",
-  "updated_at": "2026-09-15T16:48:16.956Z",
-  "phases": [
-    {
-      "id": 1,
-      "goal": "Fase 0 — Scaffolding",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "scaffold root bun workspace (workspaces: packages/*)",
-          "detail": "root package.json add workspaces:[packages/*]; verify bun install exit 0 + ls packages/ non-empty",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:52.727Z",
-              "note": "root package.json + workspaces [packages/*]; bun install exit 0"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "scaffold packages/ skeleton: sdk-shared, sdk-frontend, sdk-backend, sdk-agent, cli",
-          "detail": "scaffold 5 pkg @puna/sdk-{shared,frontend,backend,agent} + cli (type:module, peer deps); verify bun pm ls 5 entry",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:52.946Z",
-              "note": "5 SDK pkgs sdk-shared/frontend/backend/agent + cli + bin/puna-plugin.mjs stub; bun pm ls resolves workspace:*"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "scaffold agent/scripts/",
-          "detail": "scaffold agent/scripts/ (placeholder untuk Fase 6 link-plugin-graphs.ts); verify ls non-empty",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:53.178Z",
-              "note": "agent/scripts/README.md placeholder untuk Fase 6 link-plugin-graphs.ts"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "scaffold templates/plugin/: sticky-notes, mermaid-renderer, logging-hook, research-agent",
-          "detail": "scaffold templates/plugin/{sticky-notes,mermaid-renderer,logging-hook,research-agent}: plugin.json + ui/ + backend/ + README.md stub; verify find -name plugin.json | wc -l = 4",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:53.406Z",
-              "note": "4 archetype lengkap: sticky-notes, mermaid-renderer, logging-hook, research-agent"
-            }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "document Fase 0 di plugin-sdk-strategy §10",
-          "detail": "tulis §10 Fase 0 di references/plugin-sdk-strategy.md; verify git diff nunjukin section baru",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:53.628Z",
-              "note": "strategy §10 dokumentasikan Fase 0 (+12 lines)"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "goal": "Fase 1 — Foundation (Zod + list-only backend)",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "PluginManifest + PluginSummary Zod (packages/sdk-shared/src/manifest.ts)",
-          "detail": "packages/sdk-shared/src/manifest.ts: PluginManifest Zod strict (reject unknown, semver, path-traversal guard pada entry) + PluginSummary.source",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:53.849Z",
-              "note": "sdk-shared manifest.ts + source.ts (zod v4 strict, path-traversal guard); 16/16 tests pass"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "layered discovery mergeLayered3 (backend/src/global/workspace-scanner.ts)",
-          "detail": "backend/src/global/workspace-scanner.ts: mergeLayered3 local > workspace-global > system-global, marker plugin.json, return ThreeLayerSource",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:54.068Z",
-              "note": "workspace-scanner mergeLayered3 + ThreeLayerSource; 42/42 tests pass"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "PluginService + PluginHost list-only (backend/src/modules/plugins/)",
-          "detail": "backend/src/modules/plugins/service.ts (scan 3 lapis, kind derivation, best-effort) + host.ts singleton stub Fase 4",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:54.297Z",
-              "note": "plugins/service.ts 3-layer scan + kind derivation + best-effort list; host.ts Fase 4 stub + singleton"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "/api/plugins + /api/plugins/{id} routes (OpenAPI)",
-          "detail": "GET /api/plugins + /api/plugins/{id} via @hono/zod-openapi; re-use PluginManifest dari sdk-shared (no duplikasi Zod); regen openapi.json",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:54.525Z",
-              "note": "plugins/route.ts /api/plugins + /api/plugins/{id}; openapi.json 28 routes; SDK schema inlined, no Zod duplikasi"
-            }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "update backend/AGENTS.md Plugins Module",
-          "detail": "backend/AGENTS.md tambah ## Plugins Module (3-layer, no schema.ts, host, list-only, class service)",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:54.744Z",
-              "note": "backend/AGENTS.md +21 baris: ## Plugins Module"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "goal": "Fase 2 — Frontend slots + sticky-notes sample",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "PluginHostProvider + registry fetcher",
-          "detail": "packages/sdk-frontend registry (list + detail parallel allSettled) + React context provider/hooks; PluginHostProvider mount di frontend/src/main.tsx",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:54.951Z",
-              "note": "sdk-frontend registry (list + parallel detail, allSettled), host provider + hooks, slots + error boundary, loader, source badge; PluginHostProvider mount di main.tsx"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "PluginSlot helpers + error boundary",
-          "detail": "slots.tsx <PluginSlot name> + per-slot PluginErrorBoundary (log + fallback); data-plugin-* attrs",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:55.171Z",
-              "note": "PluginSlot + PluginErrorBoundary (log + fallback); per-slot boundary; data-plugin-* attrs"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "leftBar slot injection di u/route.tsx",
-          "detail": "u/route.tsx DOCK_ITEMS = core statik + registry.leftBar (memoized); LeftBar tetap props-driven tanpa structural change",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:55.398Z",
-              "note": "LeftDockWithPlugins di routes/u/route.tsx:124 — DOCK_ITEMS + pluginLeftBar memoized"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "footerBar 3-region slot injection",
-          "detail": "footer-bar.tsx wrap 3 region (left/center/right) dengan <PluginSlot name=\"footerBar\" position>",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:55.624Z",
-              "note": "footer-bar.tsx 3 region diwrap PluginSlot; Plugins: counter dari registry.plugins.size"
-            }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "sample plugin sticky-notes",
-          "detail": "plugins/sticky-notes: plugin.json strict + leftBar panel (list/add/delete, localStorage) + footer counter",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:55.847Z",
-              "note": "sticky-notes strict PluginManifest + full UI (list/add/delete, localStorage) + footer counter"
-            }
-          ]
-        },
-        {
-          "id": 6,
-          "title": "PluginSummary.source badge UI",
-          "detail": "PluginSourceBadge hijau/biru/ungu by PluginSummary.source + kind suffix; tampil di dock",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:56.072Z",
-              "note": "PluginSourceBadge (hijau/biru/ungu + kind suffix); dock title + source dot"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "goal": "Fase 3 — Chat renderers + tool UI + schema migration",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "ChatMessage schema migration (toolName/args/result)",
-          "detail": "chat-types.ts tambah toolName?/args?/result? opsional — legacy content-only tetap render; tool msg wajib isi toolName/args",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:56.309Z",
-              "note": "chat-types.ts tambah toolName?/args?/result? (opsional, backward-compat)"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "adapter chat-request.tsx role dispatch",
-          "detail": "chat-request.tsx role dispatch: cek custom renderer plugin dulu, fallback core bubble; wrap PluginErrorBoundary",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:56.531Z",
-              "note": "chat-request.tsx role dispatch via usePluginChatRenderers sebelum core bubble; PluginErrorBoundary wrap"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "chatRenderers slot",
-          "detail": "sdk-frontend usePluginChatRenderers + tipe kontribusi human/ai/tool + resolver module map batch",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:56.765Z",
-              "note": "sdk-frontend usePluginChatRenderers + tipe renderer; useResolvedModuleMap batch resolver"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "toolUi slot di msg-tool",
-          "detail": "msg-tool.tsx: pakai toolUi[msg.toolName] kalau ada, else default bubble; data-plugin-tool",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:56.996Z",
-              "note": "msg-tool.tsx usePluginToolUi custom path + data-plugin-tool; WeakMap owner attribution"
-            }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "sample plugin mermaid-renderer",
-          "detail": "plugins/mermaid-renderer: manifest strict + toolUi['mermaid'] render diagram tanpa runtime berat",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:57.213Z",
-              "note": "mermaid-renderer strict manifest + toolUi mermaid: MermaidDiagram (raw source + copy, no runtime)"
-            }
-          ]
-        },
-        {
-          "id": 6,
-          "title": "ui-bundle dev serve GET /api/plugins/{id}/ui-bundle",
-          "detail": "GET /api/plugins/{id}/ui-bundle: Bun.build TS→ESM, React + @tanstack/react-router external, cache + Content-Type; 200/400/404/500; OpenAPI",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:57.428Z",
-              "note": "GET /api/plugins/{id}/ui-bundle via Bun.build; 200/400/404/500 + cache; openapi 29 routes"
-            }
-          ]
-        },
-        {
-          "id": 7,
-          "title": "React strict boundary per slot",
-          "detail": "pastikan tiap slot punya PluginErrorBoundary sendiri; plugin throw tidak crash app",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:57.656Z",
-              "note": "slots.tsx per-slot PluginErrorBoundary sudah benar (baseline Fase 2)"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "goal": "Fase 4 — Backend hooks",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "PluginHost.discoverAndLoad execute",
-          "detail": "PluginHost.discoverAndLoad: dynamic import loader.ts, per-plugin loadError snapshot, best-effort (satu gagal tidak blok lain)",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:31:00.840Z",
-              "note": "PluginHost.discoverAndLoad implemented with loadError snapshot; loader.ts dynamic import; 35/35 tests pass; tsc clean"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "transformSystemPrompt pipeline",
-          "detail": "getSystemPromptTransformers + applySystemPromptTransforms pipeline; per-plugin try/catch (throw → warn + skip); wire di agent-runtime",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:31:01.081Z",
-              "note": "getSystemPromptTransformers + applySystemPromptTransforms (try/catch per plugin, warn+skip on throw)"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "extraAgents + overrideAgentConf merge",
-          "detail": "getExtraAgents (AgentSummary[]) + applyAgentConfOverrides; merge di AgentService / GET /api/agents",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:31:01.313Z",
-              "note": "getExtraAgents + applyAgentConfOverrides exposed (AgentService merge deferred — cross-module isolation)"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "tools factory -> .runtime/plugin-tools.json + agent register",
-          "detail": "getTools namespaced <pluginId>.<name> + writeToolDescriptors → .runtime/plugin-tools.json; agent baca file + register via tools/index.ts",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:31:01.557Z",
-              "note": "getTools namespaced ${pluginId}.${name} with thin proxy; writeToolDescriptors → .runtime/plugin-tools.json (descriptors only)"
-            }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "permissions enforcement (fs/net/shell)",
-          "detail": "PermissionEnforcer fs/net/shell dari manifest.permissions + checkPermission sebelum tool implementation; v1 trusted model + dokumentasi",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:31:01.800Z",
-              "note": "PermissionEnforcer + checkPermission exposed; enforceTools v1 trusted model (opt-in verify); documented in host.ts + AGENTS.md"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "goal": "Fase 5 — Node lifecycle (HTTP hooks)",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "withPluginHooks bridge (agent)",
-          "detail": "agent plugin-bridge.ts: wrap node fn → beforeNode semua hook → fn → afterNode; spread semantics ({...out,...patch}) bukan Object.assign",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:39:29.241Z",
-              "note": "agent/src/base/.libs/plugin-bridge.ts: fetchPluginHooks (GET, cached per configDir) + runNodeHooks (POST) + withPluginHooks (spread merge, fail-open). 6 tests green."
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "wrap callModel + callTool",
-          "detail": "agent/src/base/graph.ts: bungkus callModel + callTool dengan withPluginHooks(nodeName)",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:39:29.519Z",
-              "note": "call-llm.ts/call-tool.ts wrapped via withPluginHooks('call_model'/'call_tool', impl). graph.ts unchanged (re-exports callModel/callTool). Pre-existing call-llm.test.ts first subtest broken at HEAD when backend on :3001 absent (env-dep, unrelated)"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "/api/plugins/hooks RPC",
-          "detail": "backend GET /api/plugins/hooks?workspace=: return hooks array untuk agent sub-process (komunikasi HTTP lintas proses); OpenAPI",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:39:29.770Z",
-              "note": "backend/src/modules/plugins/route.ts: GET /plugins/hooks (descriptor list) + POST /plugins/hooks (runNodeHook). OpenAPI PluginHooksResponse + PluginHooksRunResponse. openapi.json 30 routes. invalid workspace/manual configDir absence -> 400"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "sample plugin logging-hook",
-          "detail": "plugins/logging-hook: backend plugin beforeNode/afterNode → log transisi node graph",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:36:56.599Z",
-              "note": "templates/plugin/logging-hook: strict manifest + real backend/index.ts (before/after hooks, no patch) + README; logs to backend stdout"
-            }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "hook timeout 5s",
-          "detail": "fetchPluginHooks blocking + AbortSignal 5s; hook lambat di-drop + log warn; graph tetap selesai",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:39:30.031Z",
-              "note": "runNodeHook: withTimeout per-hook Promise.race, timer cleared on settle, warns on timeout. Backend default 5000ms. Agent-side hook_timeout_ms from configurable | 5000ms. Integration test asserts 25ms-threshold drop fast"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "goal": "Fase 6 — Custom graphs",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "manifest graphs[] resolver (link-plugin-graphs.ts)",
-          "detail": "agent/scripts/link-plugin-graphs.ts: baca manifest graphs[] → symlink agent/.plugins/<id>/graph.ts → rewrite agent/langgraph.json",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 2,
-          "title": "wire to dev.sh",
-          "detail": "dev.sh panggil link-plugin-graphs.ts sebelum start LangGraph server (regenerate saat plugin di-enable)",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 3,
-          "title": "sample plugin research-agent graph",
-          "detail": "plugins/research-agent: manifest graphs[] (entry + export) + module graph",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 4,
-          "title": "namespace policy <pluginId>.<name>",
-          "detail": "host prepend namespace <pluginId>.<name> (author tidak tulis prefix); manifest opsional alias override",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:48:16.825Z",
-              "note": "host.getGraphs() returns namespaced PluginGraphDescriptor[] via resolveGraphKey. 4 tests pass."
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "goal": "Fase 7 — SDK + publish",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "publish @puna/sdk-shared (verdaccio / bun link)",
-          "detail": "build + publish @puna/sdk-shared ke Verdaccio / bun link; exports map + type declarations",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 2,
-          "title": "publish sdk-frontend, sdk-backend, sdk-agent",
-          "detail": "build + publish sdk-frontend, sdk-backend, sdk-agent (bun link)",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 3,
-          "title": "puna plugin create CLI",
-          "detail": "puna plugin create: scaffold dari templates/plugin/* ke .puna/plugins/<name>",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 4,
-          "title": "puna plugin dev watch",
-          "detail": "puna plugin dev: watch + hot-reload plugin di workspace .puna/plugins/",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 5,
-          "title": "puna plugin build",
-          "detail": "puna plugin build: bundle prod (React/router external); target gzip ≤ 50KB",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 6,
-          "title": ".docs/plugin-authoring.md",
-          "detail": ".docs/plugin-authoring.md: manifest, permissions, slot, hook, graph, publish flow",
-          "status": "todo",
-          "progress": []
-        }
-      ]
-    },
-    {
-      "id": 9,
-      "goal": "Workspace Migration — unified bun workspace",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "unified bun workspace migration (root workspaces + backend/frontend, bunfig isolated linker, lockfile unification)",
-          "detail": "migrasi backend/ + frontend/ ke root bun workspace, bunfig isolated linker, hapus lockfile per-app, dedupe zod; verify bun pm ls 7 entry, 58/58 test, openapi 28 route",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:57.869Z",
-              "note": "root workspaces + backend/frontend; bunfig isolated linker; hapus per-app lockfile; zod dedupe; PluginManifest named OpenAPI component; 58/58 tests"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "goal": "Cross-cutting tasks",
-      "tasks": [
-        {
-          "id": 1,
-          "title": "update frontend/AGENTS.md plugin section",
-          "detail": "frontend/AGENTS.md tambah ## Plugin Slots (registry contract, slot region, error-boundary policy)",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:58.093Z",
-              "note": "frontend/AGENTS.md + ## Plugin Slots (registry contract, slot regions, error-boundary policy)"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "update backend/AGENTS.md plugin module rule",
-          "detail": "backend/AGENTS.md tambah ## Plugins Module rule (3-layer, no schema.ts, host, list-only, class service)",
-          "status": "completed",
-          "progress": [
-            {
-              "at": "2026-09-15T16:03:58.312Z",
-              "note": "backend/AGENTS.md + ## Plugins Module (3-layer, no schema.ts, host stub, list-only, class service)"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "sample plugins tested per OS (linux/darwin)",
-          "detail": "jalankan sample plugin di linux + darwin, dokumentasikan hasil",
-          "status": "todo",
-          "progress": []
-        },
-        {
-          "id": 4,
-          "title": "performance budget: plugin load <=100ms p95",
-          "detail": "ukur plugin load ≤ 100ms p95 + log timing",
-          "status": "todo",
-          "progress": []
-        }
-      ]
-    }
-  ]
+let currentData = null;
+let currentFilter = 'all';
+let lastSync = null;
+let isFetching = false;
+let pollTimer = null;
+
+async function loadData(){
+  try {
+    const res = await fetch('./task.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+    const data = await res.json();
+    currentData = data;
+    lastSync = new Date();
+    render(data);
+    startPolling();
+    watchVisibility();
+    updateSyncStatus(true, false);
+  } catch (err) {
+    showError(err);
+  }
 }
-;
+
+function showError(err){
+  document.getElementById('stat-total').textContent = '—';
+  document.getElementById('stat-done').textContent = '—';
+  document.getElementById('stat-todo').textContent = '—';
+  document.getElementById('stat-pct').textContent = '—';
+  document.getElementById('overall-fill').style.width = '0%';
+
+  const board = document.getElementById('board');
+  board.innerHTML = `
+    <div class="w-full flex justify-center">
+      <div class="w-full max-w-2xl mx-auto p-6 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200">
+        <div class="flex items-start gap-3">
+          <div class="text-2xl">⚠</div>
+          <div class="min-w-0">
+            <h2 class="text-lg font-semibold text-slate-100 mb-1">Gagal memuat data</h2>
+            <p class="text-sm text-slate-400 mb-3">File <code class="font-mono text-indigo-400">task.json</code> tidak bisa dimuat. Halaman ini butuh server HTTP; jangan dibuka langsung lewat <code class="font-mono text-slate-500">file://</code>.</p>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Jalankan server lokal</p>
+            <div class="bg-slate-950 rounded-lg p-3 border border-slate-800 font-mono text-xs text-slate-300 mb-3 select-all">
+              python3 -m http.server -d docs/plans/plugin-sdk 8000
+            </div>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Buka</p>
+            <div class="bg-slate-950 rounded-lg p-3 border border-slate-800 font-mono text-xs text-indigo-400 mb-3 select-all">
+              http://localhost:8000/task.html
+            </div>
+            <p class="text-xs text-slate-500 font-mono break-all">${escapeHtml(err.message || String(err))}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function sameData(a, b){
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+async function tick(){
+  if (isFetching || !currentData) return;
+  isFetching = true;
+  try {
+    const res = await fetch('./task.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const next = await res.json();
+    if (sameData(currentData, next)) {
+      lastSync = new Date();
+      updateSyncStatus(true, false);
+    } else {
+      currentData = next;
+      render(next);
+      flashUpdated();
+      lastSync = new Date();
+      updateSyncStatus(true, false);
+    }
+  } catch (err) {
+    updateSyncStatus(false, true);
+  } finally {
+    isFetching = false;
+  }
+}
+
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(tick, 2000);
+}
+
+function stopPolling(){
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function watchVisibility(){
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopPolling();
+    } else {
+      tick();
+      startPolling();
+    }
+  });
+}
 
 function fmtTime(iso){
   const d = new Date(iso);
   return d.toLocaleString('id-ID', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 }
 
-function render(){
+function render(DATA){
   const phases = DATA.phases;
   let total=0, done=0;
 
   const board = document.getElementById('board');
+  const container = board.parentElement;
+  const scrollLeft = container.scrollLeft;
   board.innerHTML = '';
 
   phases.forEach(phase => {
@@ -699,7 +221,7 @@ function render(){
       <div class="sticky top-0 z-10 p-4 bg-slate-900/95 backdrop-blur border-b border-slate-800 rounded-t-2xl">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <div class="font-mono text-[10px] uppercase tracking-wider text-indigo-400 mb-0.5">FASE ${String(phase.id).padStart(2,'0')}</div>
+            <div class="font-mono text-[10px] uppercase tracking-wider text-indigo-400 mb-0.5">FASE ID ${String(phase.id).padStart(2,'0')}</div>
             <h2 class="text-sm font-semibold text-slate-100 leading-tight">${escapeHtml(title)}</h2>
           </div>
           <div class="shrink-0 mt-0.5">
@@ -735,6 +257,29 @@ function render(){
 
   document.getElementById('foot-created').textContent = 'dibuat ' + fmtTime(DATA.created_at);
   document.getElementById('foot-updated').textContent = 'update terakhir ' + fmtTime(DATA.updated_at);
+
+  applyFilter(currentFilter);
+  container.scrollLeft = scrollLeft;
+}
+
+function applyFilter(mode){
+  currentFilter = mode;
+  document.querySelectorAll('.fbtn').forEach(b => {
+    const active = b.dataset.filter === mode;
+    b.classList.toggle('active', active);
+    b.classList.toggle('bg-indigo-600', active);
+    b.classList.toggle('border-indigo-600', active);
+    b.classList.toggle('text-white', active);
+    b.classList.toggle('border-slate-700', !active);
+    b.classList.toggle('text-slate-400', !active);
+  });
+  document.querySelectorAll('.phase').forEach(p => {
+    const state = p.dataset.state;
+    let show = true;
+    if (mode === 'open') show = state !== 'complete';
+    if (mode === 'complete') show = state === 'complete';
+    p.style.display = show ? '' : 'none';
+  });
 }
 
 function renderTask(t, phaseId){
@@ -770,26 +315,35 @@ function escapeHtml(str){
   return d.innerHTML;
 }
 
+function updateSyncStatus(ok, isError){
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const time = lastSync ? lastSync.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '--:--:--';
+  if (isError) {
+    el.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>koneksi gagal — retry 5s</span><span class="text-slate-600">${time}</span>`;
+  } else {
+    el.innerHTML = `<span class="w-2 h-2 rounded-full ${ok ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span><span>auto-refresh 5s</span><span class="text-slate-600">${time}</span>`;
+  }
+}
+
+function flashUpdated(){
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const updated = document.createElement('span');
+  updated.className = 'text-emerald-400 font-medium transition-opacity duration-500';
+  updated.textContent = 'diperbarui';
+  el.appendChild(updated);
+  setTimeout(() => { updated.classList.add('opacity-0'); }, 1200);
+  setTimeout(() => { if (updated.parentNode) updated.parentNode.removeChild(updated); }, 1750);
+}
+
 document.querySelectorAll('.fbtn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.fbtn').forEach(b => {
-      b.classList.remove('active', 'bg-indigo-600', 'border-indigo-600', 'text-white');
-      b.classList.add('border-slate-700', 'text-slate-400');
-    });
-    btn.classList.add('active', 'bg-indigo-600', 'border-indigo-600', 'text-white');
-    btn.classList.remove('border-slate-700', 'text-slate-400');
-    const mode = btn.dataset.filter;
-    document.querySelectorAll('.phase').forEach(p => {
-      const state = p.dataset.state;
-      let show = true;
-      if (mode === 'open') show = state !== 'complete';
-      if (mode === 'complete') show = state === 'complete';
-      p.style.display = show ? '' : 'none';
-    });
+    applyFilter(btn.dataset.filter);
   });
 });
 
-render();
+loadData();
 </script>
 </body>
 </html>

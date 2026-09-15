@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "description": "Plugin SDK — frontend slot helpers, registry loader, PluginHostProvider.",
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.ts",
     "./slots": "./src/slots.tsx",
@@ -14,10 +14,15 @@
     "./loader": "./src/loader.ts"
   },
   "files": [
-    "src"
+    "src",
+    "dist"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "rm -rf dist && bun run build:js && bun run build:types",
+    "build:js": "bun build ./src/index.ts ./src/slots.tsx ./src/host.tsx ./src/registry.ts ./src/loader.ts ./src/badge.tsx --outdir dist --target browser --format esm --production --external react --external react-dom --external react/jsx-runtime --external react-dom/client --external @tanstack/react-router --external @puna/sdk-shared",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "@puna/sdk-shared": "workspace:*"

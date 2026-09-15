@@ -66,6 +66,9 @@
       "dependencies": {
         "@puna/sdk-shared": "workspace:*",
       },
+      "devDependencies": {
+        "typescript": "~6.0.2",
+      },
       "peerDependencies": {
         "bun-types": "*",
       },
@@ -76,6 +79,10 @@
       "dependencies": {
         "@puna/sdk-shared": "workspace:*",
       },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "~6.0.2",
+      },
     },
     "packages/sdk-backend": {
       "name": "@puna/sdk-backend",
@@ -83,6 +90,10 @@
       "dependencies": {
         "@puna/sdk-shared": "workspace:*",
         "zod": "^3.23.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "~6.0.2",
       },
       "peerDependencies": {
         "hono": "^4.0.0",

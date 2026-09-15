@@ -119,9 +119,19 @@ export class PluginHost {
 	 * plugins whose `loadBackendModule` threw (stored as `loadError`, with
 	 * `instance: null`). Plugins without backend-side capabilities are kept in
 	 * the snapshot (for `list`/`get`) but counted in neither field.
+	 *
+	 * Load-timing instrumentation (Fase 10 task 4): logs one
+	 * `[plugins] loaded <id> in <X.Y>ms` line per discovered plugin and a
+	 * `[plugins] discoverAndLoad <workspaceId>: N plugins in <X.Y>ms`
+	 * total with the ≤100ms p95 budget called out. Logs are additive — loading
+	 * semantics, error handling, and the returned snapshot shape are unchanged.
+	 * `getPluginHostForWorkspace` caches hosts per configDir, so this runs (and
+	 * logs) once per real load; `scripts/bench-plugin-load.ts` constructs fresh
+	 * `PluginHost` instances to force real loads per iteration.
 	 */
 	async discoverAndLoad(configDir: string): Promise<DiscoverAndLoadResult> {
-		const { plugins } = await this.service.list(configDir);
+		const loadStartedAt = performance.now();
+		const { plugins, workspaceId } = await this.service.list(configDir);
 
 		const nextSummaries = new Map<string, PluginSummary>();
 		const nextLoaded = new Map<string, LoadedPlugin>();
@@ -129,69 +139,81 @@ export class PluginHost {
 		let errorCount = 0;
 
 		for (const summary of plugins) {
-			let detail: Awaited<ReturnType<PluginService["get"]>>;
+			const pluginStartedAt = performance.now();
 			try {
-				detail = await this.service.get(configDir, summary.id);
-			} catch (error) {
-				// Degraded summary from `list` — keep it visible, no backend module.
-				console.warn(
-					`[plugins] ${summary.id}: manifest detail unavailable: ${messageOf(error)}`,
+				let detail: Awaited<ReturnType<PluginService["get"]>>;
+				try {
+					detail = await this.service.get(configDir, summary.id);
+				} catch (error) {
+					// Degraded summary from `list` — keep it visible, no backend module.
+					console.warn(
+						`[plugins] ${summary.id}: manifest detail unavailable: ${messageOf(error)}`,
+					);
+					nextSummaries.set(summary.id, summary);
+					continue;
+				}
+
+				const { manifest, source, resolvedDir } = detail;
+				nextSummaries.set(manifest.id, {
+					id: manifest.id,
+					name: manifest.name,
+					version: manifest.version,
+					description: manifest.description,
+					source,
+					resolvedDir,
+					kind: this.kindFromManifest(manifest),
+				});
+
+				const hasBackend = Boolean(
+					manifest.capabilities?.backendHooks || manifest.capabilities?.tools,
 				);
-				nextSummaries.set(summary.id, summary);
-				continue;
-			}
+				if (!hasBackend) {
+					nextLoaded.set(manifest.id, {
+						id: manifest.id,
+						manifest,
+						source,
+						resolvedDir,
+						instance: null,
+					});
+					continue;
+				}
 
-			const { manifest, source, resolvedDir } = detail;
-			nextSummaries.set(manifest.id, {
-				id: manifest.id,
-				name: manifest.name,
-				version: manifest.version,
-				description: manifest.description,
-				source,
-				resolvedDir,
-				kind: this.kindFromManifest(manifest),
-			});
-
-			const hasBackend = Boolean(
-				manifest.capabilities?.backendHooks || manifest.capabilities?.tools,
-			);
-			if (!hasBackend) {
-				nextLoaded.set(manifest.id, {
-					id: manifest.id,
-					manifest,
-					source,
-					resolvedDir,
-					instance: null,
-				});
-				continue;
-			}
-
-			try {
-				const instance = await this.loader(resolvedDir, manifest);
-				nextLoaded.set(manifest.id, {
-					id: manifest.id,
-					manifest,
-					source,
-					resolvedDir,
-					instance,
-				});
-				if (instance) loadedCount += 1;
-			} catch (error) {
-				console.warn(`[plugins] ${manifest.id}: load failed: ${messageOf(error)}`);
-				errorCount += 1;
-				nextLoaded.set(manifest.id, {
-					id: manifest.id,
-					manifest,
-					source,
-					resolvedDir,
-					instance: null,
-					loadError: error instanceof Error ? error : new Error(messageOf(error)),
-				});
+				try {
+					const instance = await this.loader(resolvedDir, manifest);
+					nextLoaded.set(manifest.id, {
+						id: manifest.id,
+						manifest,
+						source,
+						resolvedDir,
+						instance,
+					});
+					if (instance) loadedCount += 1;
+				} catch (error) {
+					console.warn(`[plugins] ${manifest.id}: load failed: ${messageOf(error)}`);
+					errorCount += 1;
+					nextLoaded.set(manifest.id, {
+						id: manifest.id,
+						manifest,
+						source,
+						resolvedDir,
+						instance: null,
+						loadError: error instanceof Error ? error : new Error(messageOf(error)),
+					});
+				}
+			} finally {
+				const pluginMs = performance.now() - pluginStartedAt;
+				console.log(`[plugins] loaded ${summary.id} in ${pluginMs.toFixed(1)}ms`);
 			}
 		}
 
 		this.summaries = nextSummaries;
 		this.loaded = nextLoaded;
+
+		const totalMs = performance.now() - loadStartedAt;
+		console.log(
+			`[plugins] discoverAndLoad ${workspaceId}: ${plugins.length} plugins in ${totalMs.toFixed(1)}ms (p95 budget 100ms)`,
+		);
+
 		return { loaded: loadedCount, errors: errorCount };
 	}
 
